@@ -8,6 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/ethers@6.8.0/dist/ethers.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <style>
         .hero-section {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -256,6 +257,38 @@
                             </div>
                         </div>
 
+                        <!-- Step 5: Completion -->
+                        <div class="card step-card step-disabled mb-4" id="step5-card" style="display: none;">
+                            <div class="card-body">
+                                <div class="step-header mb-3">
+                                    <div class="step-number step-pending" id="step5-number">5</div>
+                                    <div>Repayment Complete!</div>
+                                </div>
+                                <div class="text-center">
+                                    <div class="mb-3">
+                                        <i class="bi bi-check-circle-fill text-success" style="font-size: 3rem;"></i>
+                                    </div>
+                                    <h4 class="text-success mb-3">🎉 Congratulations!</h4>
+                                    <p class="mb-3">Your loan repayment has been successfully completed.</p>
+                                    
+                                    <div class="alert alert-success">
+                                        <div class="row">
+                                            <div class="col-6">
+                                                <strong>Updated Loan Balance:</strong>
+                                            </div>
+                                            <div class="col-6">
+                                                <span class="text-muted" id="final-loan-balance">Loading...</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <button id="start-new-repayment-btn" class="btn btn-primary btn-lg">
+                                        Start New Repayment
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
             </div>
@@ -331,6 +364,10 @@
         const $step3Number = $('#step3-number');
         const $step4Card = $('#step4-card');
         const $step4Number = $('#step4-number');
+        const $step5Card = $('#step5-card');
+        const $step5Number = $('#step5-number');
+        const $finalLoanBalance = $('#final-loan-balance');
+        const $startNewRepaymentBtn = $('#start-new-repayment-btn');
 
         // Initialize wallet address if provided in URL
         const walletAddress = urlParams.get('wallet_address');
@@ -346,6 +383,7 @@
         $repayAmountInput.on('input', updateConversion);
         $approveUsdcBtn.on('click', approveUSDC);
         $repayLoanBtn.on('click', repayLoan);
+        $startNewRepaymentBtn.on('click', startNewRepayment);
 
         // Trigger address input handling if wallet address was pre-populated
         if (walletAddress) {
@@ -396,6 +434,9 @@
                     $step4Card.show();
                     $repayLoanBtn.prop('disabled', false);
                     break;
+                case 5:
+                    $step5Card.show();
+                    break;
             }
         }
 
@@ -403,7 +444,7 @@
             setStepState(stepNum, 'completed');
             
             // Auto-enable next step
-            if (stepNum < 4) {
+            if (stepNum < 5) {
                 enableStep(stepNum + 1);
             }
         }
@@ -414,12 +455,24 @@
             setStepState(2, 'disabled');
             setStepState(3, 'disabled');
             setStepState(4, 'disabled');
+            setStepState(5, 'disabled');
             
-            // Hide step 4 and disable inputs
+            // Hide step 4 and 5, disable inputs
             $step4Card.hide();
+            $step5Card.hide();
             $repayAmountInput.prop('disabled', true);
             $approveUsdcBtn.prop('disabled', true);
             $repayLoanBtn.prop('disabled', true);
+        }
+
+        function startNewRepayment() {
+            // Clear form and reset steps
+            $borrowerAddressInput.val('');
+            $loanBalanceSection.hide();
+            $loanBalance.text('Loading...');
+            $repayAmountInput.val('');
+            $usdcConversion.text('0 USDC');
+            resetSteps();
         }
 
         // Connect Wallet Function
@@ -604,18 +657,17 @@
             
             // Check if step 2 should be completed (valid amount entered)
             const hasValidAddress = $borrowerAddressInput.val().trim().length === 42 && $borrowerAddressInput.val().trim().startsWith('0x');
-            const hasLoanBalance = $loanBalanceSection.is(':visible') && !$loanBalance.text().includes('Error');
             const hasValidAmount = dollarAmount > 0;
             
-            if (hasValidAddress && hasLoanBalance && hasValidAmount) {
-                // Complete step 2 and enable step 3
+            if (hasValidAddress && hasValidAmount) {
+                // Complete step 2 and enable step 3 - allow progression even without loan balance loaded
                 completeStep(2);
                 
                 // Enable approve button if wallet is connected
                 if (userAddress) {
                     $approveUsdcBtn.prop('disabled', false);
                 }
-            } else if (hasValidAddress && hasLoanBalance) {
+            } else if (hasValidAddress) {
                 // Step 1 completed, step 2 active but not completed
                 setStepState(2, 'active');
                 $approveUsdcBtn.prop('disabled', true);
@@ -765,15 +817,12 @@
                     // Refresh loan balance to show updated amount
                     await updateLoanBalance();
                     
-                    // Complete step 4 and reset form
+                    // Complete step 4 and show step 5 with final results
                     completeStep(4);
                     
-                    // Reset form after a delay to show completion
-                    setTimeout(() => {
-                        $repayAmountInput.val('');
-                        $usdcConversion.text('0 USDC');
-                        resetSteps();
-                    }, 2000);
+                    // Update final loan balance display
+                    const finalBalance = $loanBalance.text();
+                    $finalLoanBalance.text(finalBalance);
                     
                     // Refresh USDC balance
                     await updateBalance();
