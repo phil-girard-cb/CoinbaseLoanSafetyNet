@@ -177,9 +177,20 @@
                             </div>
                         </div>
 
-                        <button id="approve-usdc-btn" class="btn btn-success btn-lg w-100" disabled>
+                        <button id="approve-usdc-btn" class="btn btn-success btn-lg w-100 mb-3" disabled>
                             <span class="loading-spinner spinner-border spinner-border-sm me-2" role="status"></span>
                             Approve USDC Spending
+                        </button>
+
+                        <div class="mb-3" id="repay-step-section" style="display: none;">
+                            <div class="alert alert-success">
+                                <strong>Step 4:</strong> Repay the loan with approved USDC
+                            </div>
+                        </div>
+
+                        <button id="repay-loan-btn" class="btn btn-primary btn-lg w-100" disabled style="display: none;">
+                            <span id="repay-spinner" class="spinner-border spinner-border-sm me-2" role="status" style="display: none;"></span>
+                            Repay Loan
                         </button>
                     </div>
                 </div>
@@ -220,9 +231,10 @@
             "function decimals() external view returns (uint8)"
         ];
 
-        // Morpho ABI for position function
+        // Morpho ABI for position and repay functions
         const MORPHO_ABI = [
-            "function position(bytes32 id, address user) external view returns (uint256 supplyShares, uint128 borrowShares, uint128 collateral)"
+            "function position(bytes32 id, address user) external view returns (uint256 supplyShares, uint128 borrowShares, uint128 collateral)",
+            "function repay(tuple(address loanToken, address collateralToken, address oracle, address irm, uint256 lltv) marketParams, uint256 assets, uint256 shares, address onBehalf, bytes data) external returns (uint256, uint256)"
         ];
 
         // DOM Elements
@@ -242,6 +254,9 @@
         const repayAmountInput = document.getElementById('repay-amount');
         const usdcConversion = document.getElementById('usdc-conversion');
         const approveUsdcBtn = document.getElementById('approve-usdc-btn');
+        const repayStepSection = document.getElementById('repay-step-section');
+        const repayLoanBtn = document.getElementById('repay-loan-btn');
+        const repaySpinner = document.getElementById('repay-spinner');
 
         // Event Listeners
         connectWalletBtn.addEventListener('click', connectWallet);
@@ -250,6 +265,7 @@
         refreshBalanceBtn.addEventListener('click', refreshLoanBalance);
         repayAmountInput.addEventListener('input', updateConversion);
         approveUsdcBtn.addEventListener('click', approveUSDC);
+        repayLoanBtn.addEventListener('click', repayLoan);
 
         // Connect Wallet Function
         async function connectWallet() {
@@ -277,7 +293,7 @@
 
                 // Initialize contracts
                 usdcContract = new ethers.Contract(USDC_ADDRESS, USDC_ABI, signer);
-                morphoContract = new ethers.Contract(MORPHO_ADDRESS, MORPHO_ABI, provider);
+                morphoContract = new ethers.Contract(MORPHO_ADDRESS, MORPHO_ABI, signer);
 
                 // Update UI
                 updateWalletUI();
@@ -478,6 +494,11 @@
                         text: `Successfully approved $${dollarAmount.toFixed(2)} USDC spending`,
                         footer: `<a href="https://basescan.org/tx/${receipt.hash}" target="_blank">View on BaseScan</a>`
                     });
+
+                    // Enable repay functionality
+                    repayStepSection.style.display = 'block';
+                    repayLoanBtn.style.display = 'block';
+                    repayLoanBtn.disabled = false;
                 } else {
                     throw new Error('Transaction failed');
                 }
@@ -504,6 +525,113 @@
             }
         }
 
+        // Repay Loan Function
+        async function repayLoan() {
+            try {
+                const dollarAmount = parseFloat(repayAmountInput.value);
+                const borrowerAddress = borrowerAddressInput.value.trim();
+                
+                if (!dollarAmount || dollarAmount <= 0) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Invalid Amount',
+                        text: 'Please enter a valid repayment amount',
+                    });
+                    return;
+                }
+
+                if (!borrowerAddress) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Missing Address',
+                        text: 'Please enter the borrower address',
+                    });
+                    return;
+                }
+
+                // Convert to USDC units (6 decimals)
+                const usdcAmount = ethers.parseUnits(dollarAmount.toString(), USDC_DECIMALS);
+
+                // Show loading state
+                repayLoanBtn.disabled = true;
+                repaySpinner.style.display = 'inline-block';
+                repayLoanBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Repaying...';
+
+                // Construct market parameters from URL params
+                const marketParams = {
+                    loanToken: urlParams.get('loan_token'),
+                    collateralToken: urlParams.get('collateral_token'),
+                    oracle: urlParams.get('oracle'),
+                    irm: urlParams.get('irm'),
+                    lltv: urlParams.get('lltv')
+                };
+
+                // Execute repay transaction
+                const tx = await morphoContract.repay(
+                    marketParams,    // MarketParams struct
+                    usdcAmount,      // assets to repay
+                    0,               // shares (0 means repay by assets amount)
+                    borrowerAddress, // onBehalf (address to repay for)
+                    "0x"            // data (empty bytes)
+                );
+                
+                Swal.fire({
+                    icon: 'info',
+                    title: 'Transaction Submitted',
+                    text: 'Please wait for confirmation...',
+                    showConfirmButton: false,
+                    timer: 3000
+                });
+
+                // Wait for transaction confirmation
+                const receipt = await tx.wait();
+
+                if (receipt.status === 1) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Loan Repaid Successfully!',
+                        text: `Successfully repaid $${dollarAmount.toFixed(2)} USDC for ${borrowerAddress.slice(0, 6)}...${borrowerAddress.slice(-4)}`,
+                        footer: `<a href="https://basescan.org/tx/${receipt.hash}" target="_blank">View on BaseScan</a>`
+                    });
+
+                    // Refresh loan balance to show updated amount
+                    await updateLoanBalance();
+                    
+                    // Reset form
+                    repayAmountInput.value = '';
+                    usdcConversion.textContent = '0 USDC';
+                    repayStepSection.style.display = 'none';
+                    repayLoanBtn.style.display = 'none';
+                    
+                    // Refresh USDC balance
+                    await updateBalance();
+                } else {
+                    throw new Error('Transaction failed');
+                }
+
+            } catch (error) {
+                console.error('Repay error:', error);
+                let errorMessage = 'Repayment transaction failed';
+                
+                if (error.code === 4001) {
+                    errorMessage = 'Transaction rejected by user';
+                } else if (error.message) {
+                    errorMessage = error.message;
+                }
+
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Repayment Failed',
+                    text: errorMessage,
+                });
+            } finally {
+                // Reset button state
+                repayLoanBtn.disabled = false;
+                repaySpinner.style.display = 'none';
+                repayLoanBtn.innerHTML = '<span id="repay-spinner" class="spinner-border spinner-border-sm me-2" role="status" style="display: none;"></span>Repay Loan';
+            }
+        }
+
         // Disconnect Wallet
         function disconnectWallet() {
             provider = null;
@@ -527,6 +655,11 @@
             repayAmountInput.value = '';
             repayAmountInput.disabled = true;
             usdcConversion.textContent = '0 USDC';
+            
+            // Hide repay button and step
+            repayStepSection.style.display = 'none';
+            repayLoanBtn.style.display = 'none';
+            repayLoanBtn.disabled = true;
         }
 
         // Handle account changes
