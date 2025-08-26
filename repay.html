@@ -83,6 +83,10 @@
                                 <label class="form-label fw-bold">LLTV:</label>
                                 <div class="param-value" id="lltv">Loading...</div>
                             </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Market ID:</label>
+                                <div class="param-value" id="market-id">Loading...</div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -109,11 +113,19 @@
                                 </div>
                             </div>
                             <div class="row mt-3">
-                                <div class="col-md-6">
+                                <div class="col-md-4">
                                     <label class="form-label fw-bold">USDC Balance:</label>
                                     <div class="balance-display" id="usdc-balance">Loading...</div>
                                 </div>
-                                <div class="col-md-6 text-end">
+                                <div class="col-md-4">
+                                    <label class="form-label fw-bold">Loan Balance:</label>
+                                    <div class="balance-display text-danger" id="loan-balance">Loading...</div>
+                                    <button id="refresh-balance-btn" class="btn btn-sm btn-outline-primary mt-1">
+                                        <span id="refresh-spinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
+                                        Refresh
+                                    </button>
+                                </div>
+                                <div class="col-md-4 text-end">
                                     <button id="disconnect-wallet-btn" class="btn btn-outline-secondary">Disconnect</button>
                                 </div>
                             </div>
@@ -162,11 +174,13 @@
         document.getElementById('oracle').textContent = urlParams.get('oracle') || 'Not specified';
         document.getElementById('irm').textContent = urlParams.get('irm') || 'Not specified';
         document.getElementById('lltv').textContent = urlParams.get('lltv') || 'Not specified';
+        document.getElementById('market-id').textContent = urlParams.get('market_id') || 'Not specified';
 
         // Web3 Configuration
         const BASE_CHAIN_ID = 8453;
         const USDC_ADDRESS = urlParams.get('loan_token') || '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
         const MORPHO_ADDRESS = '0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb';
+        const MARKET_ID = urlParams.get('market_id') || '0x9103c3b4e834476c9a62ea009ba2c884ee42e94e6e314a26f04d312434191836';
         const USDC_DECIMALS = 6;
 
         // Global variables
@@ -174,12 +188,18 @@
         let signer = null;
         let userAddress = null;
         let usdcContract = null;
+        let morphoContract = null;
 
         // USDC ABI for approve and balanceOf functions
         const USDC_ABI = [
             "function approve(address spender, uint256 amount) external returns (bool)",
             "function balanceOf(address account) external view returns (uint256)",
             "function decimals() external view returns (uint8)"
+        ];
+
+        // Morpho ABI for position function
+        const MORPHO_ABI = [
+            "function position(bytes32 id, address user) external view returns (uint256 supplyShares, uint128 borrowShares, uint128 collateral)"
         ];
 
         // DOM Elements
@@ -190,6 +210,9 @@
         const walletAddress = document.getElementById('wallet-address');
         const networkStatus = document.getElementById('network-status');
         const usdcBalance = document.getElementById('usdc-balance');
+        const loanBalance = document.getElementById('loan-balance');
+        const refreshBalanceBtn = document.getElementById('refresh-balance-btn');
+        const refreshSpinner = document.getElementById('refresh-spinner');
         const repaymentSection = document.getElementById('repayment-section');
         const repayAmountInput = document.getElementById('repay-amount');
         const usdcConversion = document.getElementById('usdc-conversion');
@@ -198,6 +221,7 @@
         // Event Listeners
         connectWalletBtn.addEventListener('click', connectWallet);
         disconnectWalletBtn.addEventListener('click', disconnectWallet);
+        refreshBalanceBtn.addEventListener('click', refreshLoanBalance);
         repayAmountInput.addEventListener('input', updateConversion);
         approveUsdcBtn.addEventListener('click', approveUSDC);
 
@@ -225,12 +249,14 @@
                     return;
                 }
 
-                // Initialize USDC contract
+                // Initialize contracts
                 usdcContract = new ethers.Contract(USDC_ADDRESS, USDC_ABI, signer);
+                morphoContract = new ethers.Contract(MORPHO_ADDRESS, MORPHO_ABI, provider);
 
                 // Update UI
                 updateWalletUI();
                 await updateBalance();
+                await updateLoanBalance();
 
             } catch (error) {
                 console.error('Wallet connection error:', error);
@@ -310,6 +336,32 @@
             }
         }
 
+        // Update Loan Balance
+        async function updateLoanBalance() {
+            try {
+                const position = await morphoContract.position(MARKET_ID, userAddress);
+                const borrowShares = position.borrowShares;
+                loanBalance.textContent = `${borrowShares.toString()} shares`;
+            } catch (error) {
+                console.error('Loan balance update error:', error);
+                loanBalance.textContent = 'Error loading loan balance';
+            }
+        }
+
+        // Refresh Loan Balance
+        async function refreshLoanBalance() {
+            try {
+                refreshSpinner.classList.remove('d-none');
+                refreshBalanceBtn.disabled = true;
+                await updateLoanBalance();
+            } catch (error) {
+                console.error('Refresh error:', error);
+            } finally {
+                refreshSpinner.classList.add('d-none');
+                refreshBalanceBtn.disabled = false;
+            }
+        }
+
         // Update Conversion Display
         function updateConversion() {
             const dollarAmount = parseFloat(repayAmountInput.value) || 0;
@@ -384,8 +436,7 @@
             } finally {
                 // Reset button state
                 approveUsdcBtn.disabled = false;
-                document.querySelector('.loading-spinner').style.display = 'none';
-                approveUsdcBtn.innerHTML = '<span class="loading-spinner spinner-border spinner-border-sm me-2" role="status"></span>Approve USDC Spending';
+                approveUsdcBtn.innerHTML = 'Approve USDC Spending';
             }
         }
 
@@ -395,6 +446,7 @@
             signer = null;
             userAddress = null;
             usdcContract = null;
+            morphoContract = null;
 
             walletConnected.classList.add('d-none');
             walletDisconnected.classList.remove('d-none');
@@ -403,6 +455,7 @@
             walletAddress.textContent = 'Not connected';
             networkStatus.textContent = 'Checking...';
             usdcBalance.textContent = 'Loading...';
+            loanBalance.textContent = 'Loading...';
             repayAmountInput.value = '';
             usdcConversion.textContent = '0 USDC';
         }
