@@ -113,19 +113,11 @@
                                 </div>
                             </div>
                             <div class="row mt-3">
-                                <div class="col-md-4">
+                                <div class="col-md-6">
                                     <label class="form-label fw-bold">USDC Balance:</label>
                                     <div class="balance-display" id="usdc-balance">Loading...</div>
                                 </div>
-                                <div class="col-md-4">
-                                    <label class="form-label fw-bold">Loan Balance:</label>
-                                    <div class="balance-display text-danger" id="loan-balance">Loading...</div>
-                                    <button id="refresh-balance-btn" class="btn btn-sm btn-outline-primary mt-1">
-                                        <span id="refresh-spinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
-                                        Refresh
-                                    </button>
-                                </div>
-                                <div class="col-md-4 text-end">
+                                <div class="col-md-6 text-end">
                                     <button id="disconnect-wallet-btn" class="btn btn-outline-secondary">Disconnect</button>
                                 </div>
                             </div>
@@ -140,17 +132,48 @@
                     </div>
                     <div class="card-body">
                         <div class="mb-3">
+                            <div class="alert alert-info">
+                                <strong>Step 1:</strong> Enter the address that has the loan to repay
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="borrower-address" class="form-label fw-bold">Borrower Address</label>
+                            <input type="text" class="form-control" id="borrower-address" placeholder="0x..." maxlength="42">
+                            <div class="form-text">Enter the Ethereum address that has the loan position</div>
+                        </div>
+
+                        <div class="mb-3" id="loan-balance-section" style="display: none;">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <label class="form-label fw-bold">Loan Balance:</label>
+                                    <div class="balance-display text-danger" id="loan-balance">Loading...</div>
+                                </div>
+                                <button id="refresh-balance-btn" class="btn btn-sm btn-outline-primary">
+                                    <span id="refresh-spinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
+                                    Refresh
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <div class="alert alert-secondary">
+                                <strong>Step 2:</strong> Enter repayment amount after confirming loan balance
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
                             <label for="repay-amount" class="form-label fw-bold">Repayment Amount (USD)</label>
                             <div class="input-group">
                                 <span class="input-group-text">$</span>
-                                <input type="number" class="form-control" id="repay-amount" placeholder="0.00" min="0" step="0.01">
+                                <input type="number" class="form-control" id="repay-amount" placeholder="0.00" min="0" step="0.01" disabled>
                             </div>
                             <div class="conversion-display mt-1" id="usdc-conversion">0 USDC</div>
                         </div>
                         
                         <div class="mb-3">
-                            <div class="alert alert-info">
-                                <strong>Step 1:</strong> Approve USDC spending to the Morpho contract
+                            <div class="alert alert-warning">
+                                <strong>Step 3:</strong> Approve USDC spending to the Morpho contract
                             </div>
                         </div>
 
@@ -210,6 +233,8 @@
         const walletAddress = document.getElementById('wallet-address');
         const networkStatus = document.getElementById('network-status');
         const usdcBalance = document.getElementById('usdc-balance');
+        const borrowerAddressInput = document.getElementById('borrower-address');
+        const loanBalanceSection = document.getElementById('loan-balance-section');
         const loanBalance = document.getElementById('loan-balance');
         const refreshBalanceBtn = document.getElementById('refresh-balance-btn');
         const refreshSpinner = document.getElementById('refresh-spinner');
@@ -221,6 +246,7 @@
         // Event Listeners
         connectWalletBtn.addEventListener('click', connectWallet);
         disconnectWalletBtn.addEventListener('click', disconnectWallet);
+        borrowerAddressInput.addEventListener('input', handleAddressInput);
         refreshBalanceBtn.addEventListener('click', refreshLoanBalance);
         repayAmountInput.addEventListener('input', updateConversion);
         approveUsdcBtn.addEventListener('click', approveUSDC);
@@ -256,7 +282,6 @@
                 // Update UI
                 updateWalletUI();
                 await updateBalance();
-                await updateLoanBalance();
 
             } catch (error) {
                 console.error('Wallet connection error:', error);
@@ -336,10 +361,46 @@
             }
         }
 
+        // Handle Address Input
+        async function handleAddressInput() {
+            const address = borrowerAddressInput.value.trim();
+            
+            // Basic address validation
+            if (address.length === 42 && address.startsWith('0x')) {
+                try {
+                    // Show loan balance section and fetch balance
+                    loanBalanceSection.style.display = 'block';
+                    loanBalance.textContent = 'Loading...';
+                    await updateLoanBalance(address);
+                    
+                    // Enable repayment amount input
+                    repayAmountInput.disabled = false;
+                    updateConversion(); // Update button state
+                } catch (error) {
+                    console.error('Address validation error:', error);
+                    loanBalance.textContent = 'Error loading loan balance';
+                    updateConversion(); // Update button state
+                }
+            } else {
+                // Hide loan balance section and disable repayment amount
+                loanBalanceSection.style.display = 'none';
+                repayAmountInput.disabled = true;
+                repayAmountInput.value = '';
+                usdcConversion.textContent = '0 USDC';
+                updateConversion(); // Update button state
+            }
+        }
+
         // Update Loan Balance
-        async function updateLoanBalance() {
+        async function updateLoanBalance(targetAddress = null) {
             try {
-                const position = await morphoContract.position(MARKET_ID, userAddress);
+                const addressToCheck = targetAddress || borrowerAddressInput.value.trim();
+                
+                if (!addressToCheck || !morphoContract) {
+                    throw new Error('No address provided or contract not initialized');
+                }
+
+                const position = await morphoContract.position(MARKET_ID, addressToCheck);
                 const borrowShares = position.borrowShares;
                 loanBalance.textContent = `${borrowShares.toString()} shares`;
             } catch (error) {
@@ -354,6 +415,7 @@
                 refreshSpinner.classList.remove('d-none');
                 refreshBalanceBtn.disabled = true;
                 await updateLoanBalance();
+                updateConversion(); // Update button state after refresh
             } catch (error) {
                 console.error('Refresh error:', error);
             } finally {
@@ -368,8 +430,10 @@
             const usdcAmount = dollarAmount * Math.pow(10, USDC_DECIMALS);
             usdcConversion.textContent = `${dollarAmount.toFixed(6)} USDC`;
             
-            // Enable/disable approve button
-            approveUsdcBtn.disabled = dollarAmount <= 0 || !userAddress;
+            // Enable/disable approve button - require valid address, loan balance, amount, and connected wallet
+            const hasValidAddress = borrowerAddressInput.value.trim().length === 42 && borrowerAddressInput.value.trim().startsWith('0x');
+            const hasLoanBalance = loanBalanceSection.style.display !== 'none' && !loanBalance.textContent.includes('Error');
+            approveUsdcBtn.disabled = dollarAmount <= 0 || !userAddress || !hasValidAddress || !hasLoanBalance;
         }
 
         // Approve USDC Spending
@@ -455,8 +519,13 @@
             walletAddress.textContent = 'Not connected';
             networkStatus.textContent = 'Checking...';
             usdcBalance.textContent = 'Loading...';
+            
+            // Clear repayment form
+            borrowerAddressInput.value = '';
+            loanBalanceSection.style.display = 'none';
             loanBalance.textContent = 'Loading...';
             repayAmountInput.value = '';
+            repayAmountInput.disabled = true;
             usdcConversion.textContent = '0 USDC';
         }
 
