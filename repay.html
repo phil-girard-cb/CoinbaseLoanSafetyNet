@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Repay Loan - Loan Safety Net</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/ethers@6.8.0/dist/ethers.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
@@ -200,15 +201,16 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Parse URL parameters and display them
-        const urlParams = new URLSearchParams(window.location.search);
-        
-        document.getElementById('loan-token').textContent = urlParams.get('loan_token') || 'Not specified';
-        document.getElementById('collateral-token').textContent = urlParams.get('collateral_token') || 'Not specified';
-        document.getElementById('oracle').textContent = urlParams.get('oracle') || 'Not specified';
-        document.getElementById('irm').textContent = urlParams.get('irm') || 'Not specified';
-        document.getElementById('lltv').textContent = urlParams.get('lltv') || 'Not specified';
-        document.getElementById('market-id').textContent = urlParams.get('market_id') || 'Not specified';
+        $(document).ready(function() {
+            // Parse URL parameters and display them
+            const urlParams = new URLSearchParams(window.location.search);
+            
+            $('#loan-token').text(urlParams.get('loan_token') || 'Not specified');
+            $('#collateral-token').text(urlParams.get('collateral_token') || 'Not specified');
+            $('#oracle').text(urlParams.get('oracle') || 'Not specified');
+            $('#irm').text(urlParams.get('irm') || 'Not specified');
+            $('#lltv').text(urlParams.get('lltv') || 'Not specified');
+            $('#market-id').text(urlParams.get('market_id') || 'Not specified');
 
         // Web3 Configuration
         const BASE_CHAIN_ID = 8453;
@@ -237,35 +239,35 @@
             "function repay(tuple(address loanToken, address collateralToken, address oracle, address irm, uint256 lltv) marketParams, uint256 assets, uint256 shares, address onBehalf, bytes data) external returns (uint256, uint256)"
         ];
 
-        // DOM Elements
-        const connectWalletBtn = document.getElementById('connect-wallet-btn');
-        const disconnectWalletBtn = document.getElementById('disconnect-wallet-btn');
-        const walletDisconnected = document.getElementById('wallet-disconnected');
-        const walletConnected = document.getElementById('wallet-connected');
-        const walletAddress = document.getElementById('wallet-address');
-        const networkStatus = document.getElementById('network-status');
-        const usdcBalance = document.getElementById('usdc-balance');
-        const borrowerAddressInput = document.getElementById('borrower-address');
-        const loanBalanceSection = document.getElementById('loan-balance-section');
-        const loanBalance = document.getElementById('loan-balance');
-        const refreshBalanceBtn = document.getElementById('refresh-balance-btn');
-        const refreshSpinner = document.getElementById('refresh-spinner');
-        const repaymentSection = document.getElementById('repayment-section');
-        const repayAmountInput = document.getElementById('repay-amount');
-        const usdcConversion = document.getElementById('usdc-conversion');
-        const approveUsdcBtn = document.getElementById('approve-usdc-btn');
-        const repayStepSection = document.getElementById('repay-step-section');
-        const repayLoanBtn = document.getElementById('repay-loan-btn');
-        const repaySpinner = document.getElementById('repay-spinner');
+        // jQuery DOM Elements
+        const $connectWalletBtn = $('#connect-wallet-btn');
+        const $disconnectWalletBtn = $('#disconnect-wallet-btn');
+        const $walletDisconnected = $('#wallet-disconnected');
+        const $walletConnected = $('#wallet-connected');
+        const $walletAddress = $('#wallet-address');
+        const $networkStatus = $('#network-status');
+        const $usdcBalance = $('#usdc-balance');
+        const $borrowerAddressInput = $('#borrower-address');
+        const $loanBalanceSection = $('#loan-balance-section');
+        const $loanBalance = $('#loan-balance');
+        const $refreshBalanceBtn = $('#refresh-balance-btn');
+        const $refreshSpinner = $('#refresh-spinner');
+        const $repaymentSection = $('#repayment-section');
+        const $repayAmountInput = $('#repay-amount');
+        const $usdcConversion = $('#usdc-conversion');
+        const $approveUsdcBtn = $('#approve-usdc-btn');
+        const $repayStepSection = $('#repay-step-section');
+        const $repayLoanBtn = $('#repay-loan-btn');
+        const $repaySpinner = $('#repay-spinner');
 
-        // Event Listeners
-        connectWalletBtn.addEventListener('click', connectWallet);
-        disconnectWalletBtn.addEventListener('click', disconnectWallet);
-        borrowerAddressInput.addEventListener('input', handleAddressInput);
-        refreshBalanceBtn.addEventListener('click', refreshLoanBalance);
-        repayAmountInput.addEventListener('input', updateConversion);
-        approveUsdcBtn.addEventListener('click', approveUSDC);
-        repayLoanBtn.addEventListener('click', repayLoan);
+        // jQuery Event Listeners
+        $connectWalletBtn.on('click', connectWallet);
+        $disconnectWalletBtn.on('click', disconnectWallet);
+        $borrowerAddressInput.on('input', handleAddressInput);
+        $refreshBalanceBtn.on('click', refreshLoanBalance);
+        $repayAmountInput.on('input', updateConversion);
+        $approveUsdcBtn.on('click', approveUSDC);
+        $repayLoanBtn.on('click', repayLoan);
 
         // Connect Wallet Function
         async function connectWallet() {
@@ -357,12 +359,12 @@
 
         // Update Wallet UI
         function updateWalletUI() {
-            walletDisconnected.classList.add('d-none');
-            walletConnected.classList.remove('d-none');
-            repaymentSection.style.display = 'block';
+            $walletDisconnected.addClass('d-none');
+            $walletConnected.removeClass('d-none');
+            $repaymentSection.show();
             
-            walletAddress.textContent = `${userAddress.slice(0, 6)}...${userAddress.slice(-4)}`;
-            networkStatus.innerHTML = '<span class="badge bg-success">Base Network</span>';
+            $walletAddress.text(`${userAddress.slice(0, 6)}...${userAddress.slice(-4)}`);
+            $networkStatus.html('<span class="badge bg-success">Base Network</span>');
         }
 
         // Update USDC Balance
@@ -370,39 +372,39 @@
             try {
                 const balance = await usdcContract.balanceOf(userAddress);
                 const balanceFormatted = ethers.formatUnits(balance, USDC_DECIMALS);
-                usdcBalance.textContent = `$${parseFloat(balanceFormatted).toFixed(2)}`;
+                $usdcBalance.text(`$${parseFloat(balanceFormatted).toFixed(2)}`);
             } catch (error) {
                 console.error('Balance update error:', error);
-                usdcBalance.textContent = 'Error loading balance';
+                $usdcBalance.text('Error loading balance');
             }
         }
 
         // Handle Address Input
         async function handleAddressInput() {
-            const address = borrowerAddressInput.value.trim();
+            const address = $borrowerAddressInput.val().trim();
             
             // Basic address validation
             if (address.length === 42 && address.startsWith('0x')) {
                 try {
                     // Show loan balance section and fetch balance
-                    loanBalanceSection.style.display = 'block';
-                    loanBalance.textContent = 'Loading...';
+                    $loanBalanceSection.show();
+                    $loanBalance.text('Loading...');
                     await updateLoanBalance(address);
                     
                     // Enable repayment amount input
-                    repayAmountInput.disabled = false;
+                    $repayAmountInput.prop('disabled', false);
                     updateConversion(); // Update button state
                 } catch (error) {
                     console.error('Address validation error:', error);
-                    loanBalance.textContent = 'Error loading loan balance';
+                    $loanBalance.text('Error loading loan balance');
                     updateConversion(); // Update button state
                 }
             } else {
                 // Hide loan balance section and disable repayment amount
-                loanBalanceSection.style.display = 'none';
-                repayAmountInput.disabled = true;
-                repayAmountInput.value = '';
-                usdcConversion.textContent = '0 USDC';
+                $loanBalanceSection.hide();
+                $repayAmountInput.prop('disabled', true);
+                $repayAmountInput.val('');
+                $usdcConversion.text('0 USDC');
                 updateConversion(); // Update button state
             }
         }
@@ -410,7 +412,7 @@
         // Update Loan Balance
         async function updateLoanBalance(targetAddress = null) {
             try {
-                const addressToCheck = targetAddress || borrowerAddressInput.value.trim();
+                const addressToCheck = targetAddress || $borrowerAddressInput.val().trim();
                 
                 if (!addressToCheck || !morphoContract) {
                     throw new Error('No address provided or contract not initialized');
@@ -418,44 +420,44 @@
 
                 const position = await morphoContract.position(MARKET_ID, addressToCheck);
                 const borrowShares = position.borrowShares;
-                loanBalance.textContent = `${borrowShares.toString()} shares`;
+                $loanBalance.text(`${borrowShares.toString()} shares`);
             } catch (error) {
                 console.error('Loan balance update error:', error);
-                loanBalance.textContent = 'Error loading loan balance';
+                $loanBalance.text('Error loading loan balance');
             }
         }
 
         // Refresh Loan Balance
         async function refreshLoanBalance() {
             try {
-                refreshSpinner.classList.remove('d-none');
-                refreshBalanceBtn.disabled = true;
+                $refreshSpinner.removeClass('d-none');
+                $refreshBalanceBtn.prop('disabled', true);
                 await updateLoanBalance();
                 updateConversion(); // Update button state after refresh
             } catch (error) {
                 console.error('Refresh error:', error);
             } finally {
-                refreshSpinner.classList.add('d-none');
-                refreshBalanceBtn.disabled = false;
+                $refreshSpinner.addClass('d-none');
+                $refreshBalanceBtn.prop('disabled', false);
             }
         }
 
         // Update Conversion Display
         function updateConversion() {
-            const dollarAmount = parseFloat(repayAmountInput.value) || 0;
+            const dollarAmount = parseFloat($repayAmountInput.val()) || 0;
             const usdcAmount = dollarAmount * Math.pow(10, USDC_DECIMALS);
-            usdcConversion.textContent = `${dollarAmount.toFixed(6)} USDC`;
+            $usdcConversion.text(`${dollarAmount.toFixed(6)} USDC`);
             
             // Enable/disable approve button - require valid address, loan balance, amount, and connected wallet
-            const hasValidAddress = borrowerAddressInput.value.trim().length === 42 && borrowerAddressInput.value.trim().startsWith('0x');
-            const hasLoanBalance = loanBalanceSection.style.display !== 'none' && !loanBalance.textContent.includes('Error');
-            approveUsdcBtn.disabled = dollarAmount <= 0 || !userAddress || !hasValidAddress || !hasLoanBalance;
+            const hasValidAddress = $borrowerAddressInput.val().trim().length === 42 && $borrowerAddressInput.val().trim().startsWith('0x');
+            const hasLoanBalance = $loanBalanceSection.is(':visible') && !$loanBalance.text().includes('Error');
+            $approveUsdcBtn.prop('disabled', dollarAmount <= 0 || !userAddress || !hasValidAddress || !hasLoanBalance);
         }
 
         // Approve USDC Spending
         async function approveUSDC() {
             try {
-                const dollarAmount = parseFloat(repayAmountInput.value);
+                const dollarAmount = parseFloat($repayAmountInput.val());
                 if (!dollarAmount || dollarAmount <= 0) {
                     Swal.fire({
                         icon: 'warning',
@@ -469,9 +471,9 @@
                 const usdcAmount = ethers.parseUnits(dollarAmount.toString(), USDC_DECIMALS);
 
                 // Show loading state
-                approveUsdcBtn.disabled = true;
-                document.querySelector('.loading-spinner').style.display = 'inline-block';
-                approveUsdcBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Approving...';
+                $approveUsdcBtn.prop('disabled', true);
+                $('.loading-spinner').show();
+                $approveUsdcBtn.html('<span class="spinner-border spinner-border-sm me-2" role="status"></span>Approving...');
 
                 // Execute approval transaction
                 const tx = await usdcContract.approve(MORPHO_ADDRESS, usdcAmount);
@@ -496,9 +498,9 @@
                     });
 
                     // Enable repay functionality
-                    repayStepSection.style.display = 'block';
-                    repayLoanBtn.style.display = 'block';
-                    repayLoanBtn.disabled = false;
+                    $repayStepSection.show();
+                    $repayLoanBtn.show();
+                    $repayLoanBtn.prop('disabled', false);
                 } else {
                     throw new Error('Transaction failed');
                 }
@@ -520,16 +522,16 @@
                 });
             } finally {
                 // Reset button state
-                approveUsdcBtn.disabled = false;
-                approveUsdcBtn.innerHTML = 'Approve USDC Spending';
+                $approveUsdcBtn.prop('disabled', false);
+                $approveUsdcBtn.html('Approve USDC Spending');
             }
         }
 
         // Repay Loan Function
         async function repayLoan() {
             try {
-                const dollarAmount = parseFloat(repayAmountInput.value);
-                const borrowerAddress = borrowerAddressInput.value.trim();
+                const dollarAmount = parseFloat($repayAmountInput.val());
+                const borrowerAddress = $borrowerAddressInput.val().trim();
                 
                 if (!dollarAmount || dollarAmount <= 0) {
                     Swal.fire({
@@ -553,9 +555,9 @@
                 const usdcAmount = ethers.parseUnits(dollarAmount.toString(), USDC_DECIMALS);
 
                 // Show loading state
-                repayLoanBtn.disabled = true;
-                repaySpinner.style.display = 'inline-block';
-                repayLoanBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Repaying...';
+                $repayLoanBtn.prop('disabled', true);
+                $repaySpinner.show();
+                $repayLoanBtn.html('<span class="spinner-border spinner-border-sm me-2" role="status"></span>Repaying...');
 
                 // Construct market parameters from URL params
                 const marketParams = {
@@ -598,10 +600,10 @@
                     await updateLoanBalance();
                     
                     // Reset form
-                    repayAmountInput.value = '';
-                    usdcConversion.textContent = '0 USDC';
-                    repayStepSection.style.display = 'none';
-                    repayLoanBtn.style.display = 'none';
+                    $repayAmountInput.val('');
+                    $usdcConversion.text('0 USDC');
+                    $repayStepSection.hide();
+                    $repayLoanBtn.hide();
                     
                     // Refresh USDC balance
                     await updateBalance();
@@ -626,9 +628,9 @@
                 });
             } finally {
                 // Reset button state
-                repayLoanBtn.disabled = false;
-                repaySpinner.style.display = 'none';
-                repayLoanBtn.innerHTML = '<span id="repay-spinner" class="spinner-border spinner-border-sm me-2" role="status" style="display: none;"></span>Repay Loan';
+                $repayLoanBtn.prop('disabled', false);
+                $repaySpinner.hide();
+                $repayLoanBtn.html('<span id="repay-spinner" class="spinner-border spinner-border-sm me-2" role="status" style="display: none;"></span>Repay Loan');
             }
         }
 
@@ -640,26 +642,26 @@
             usdcContract = null;
             morphoContract = null;
 
-            walletConnected.classList.add('d-none');
-            walletDisconnected.classList.remove('d-none');
-            repaymentSection.style.display = 'none';
+            $walletConnected.addClass('d-none');
+            $walletDisconnected.removeClass('d-none');
+            $repaymentSection.hide();
 
-            walletAddress.textContent = 'Not connected';
-            networkStatus.textContent = 'Checking...';
-            usdcBalance.textContent = 'Loading...';
+            $walletAddress.text('Not connected');
+            $networkStatus.text('Checking...');
+            $usdcBalance.text('Loading...');
             
             // Clear repayment form
-            borrowerAddressInput.value = '';
-            loanBalanceSection.style.display = 'none';
-            loanBalance.textContent = 'Loading...';
-            repayAmountInput.value = '';
-            repayAmountInput.disabled = true;
-            usdcConversion.textContent = '0 USDC';
+            $borrowerAddressInput.val('');
+            $loanBalanceSection.hide();
+            $loanBalance.text('Loading...');
+            $repayAmountInput.val('');
+            $repayAmountInput.prop('disabled', true);
+            $usdcConversion.text('0 USDC');
             
             // Hide repay button and step
-            repayStepSection.style.display = 'none';
-            repayLoanBtn.style.display = 'none';
-            repayLoanBtn.disabled = true;
+            $repayStepSection.hide();
+            $repayLoanBtn.hide();
+            $repayLoanBtn.prop('disabled', true);
         }
 
         // Handle account changes
@@ -676,6 +678,8 @@
                 window.location.reload();
             });
         }
+
+        }); // End of document ready
     </script>
 </body>
 </html>
