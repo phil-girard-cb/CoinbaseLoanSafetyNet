@@ -34,6 +34,50 @@
         .loading-spinner {
             display: none;
         }
+        .step-card {
+            transition: all 0.3s ease;
+            border: 2px solid #e9ecef;
+        }
+        .step-card.step-active {
+            border-color: #0d6efd;
+            box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+        }
+        .step-card.step-completed {
+            border-color: #198754;
+            background-color: #f8fff9;
+        }
+        .step-card.step-disabled {
+            background-color: #f8f9fa;
+            opacity: 0.6;
+        }
+        .step-header {
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .step-number {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .step-number.step-pending {
+            background-color: #e9ecef;
+            color: #6c757d;
+        }
+        .step-number.step-active {
+            background-color: #0d6efd;
+            color: white;
+        }
+        .step-number.step-completed {
+            background-color: #198754;
+            color: white;
+        }
     </style>
 </head>
 <body>
@@ -132,67 +176,86 @@
                         <h3 class="mb-0">Repay Loan</h3>
                     </div>
                     <div class="card-body">
-                        <div class="mb-3">
-                            <div class="alert alert-info">
-                                <strong>Step 1:</strong> Enter the address that has the loan to repay
+                        
+                        <!-- Step 1: Enter Loan Address -->
+                        <div class="card step-card step-active mb-4" id="step1-card">
+                            <div class="card-body">
+                                <div class="step-header mb-3">
+                                    <div class="step-number step-active" id="step1-number">1</div>
+                                    <div>Enter Loan Address</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="borrower-address" class="form-label fw-bold">Loan Address</label>
+                                    <input type="text" class="form-control" id="borrower-address" placeholder="0x..." maxlength="42">
+                                    <div class="form-text">Enter the Ethereum address that has the loan position</div>
+                                </div>
+                                <div class="mb-3" id="loan-balance-section" style="display: none;">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <label class="form-label fw-bold">Loan Balance:</label>
+                                            <div class="balance-display text-muted" id="loan-balance">Loading...</div>
+                                        </div>
+                                        <button id="refresh-balance-btn" class="btn btn-sm btn-outline-primary">
+                                            <span id="refresh-spinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
+                                            Refresh
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
-                        <div class="mb-3">
-                            <label for="borrower-address" class="form-label fw-bold">Borrower Address</label>
-                            <input type="text" class="form-control" id="borrower-address" placeholder="0x..." maxlength="42">
-                            <div class="form-text">Enter the Ethereum address that has the loan position</div>
+                        <!-- Step 2: Enter Repayment Amount -->
+                        <div class="card step-card step-disabled mb-4" id="step2-card">
+                            <div class="card-body">
+                                <div class="step-header mb-3">
+                                    <div class="step-number step-pending" id="step2-number">2</div>
+                                    <div>Enter Repayment Amount</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="repay-amount" class="form-label fw-bold">Repayment Amount (USD)</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">$</span>
+                                        <input type="number" class="form-control" id="repay-amount" placeholder="0.00" min="0" step="0.01" disabled>
+                                    </div>
+                                    <div class="conversion-display mt-1" id="usdc-conversion">0 USDC</div>
+                                </div>
+                            </div>
                         </div>
 
-                        <div class="mb-3" id="loan-balance-section" style="display: none;">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <label class="form-label fw-bold">Loan Balance:</label>
-                                    <div class="balance-display text-danger" id="loan-balance">Loading...</div>
+                        <!-- Step 3: Approve USDC -->
+                        <div class="card step-card step-disabled mb-4" id="step3-card">
+                            <div class="card-body">
+                                <div class="step-header mb-3">
+                                    <div class="step-number step-pending" id="step3-number">3</div>
+                                    <div>Approve USDC Spending</div>
                                 </div>
-                                <button id="refresh-balance-btn" class="btn btn-sm btn-outline-primary">
-                                    <span id="refresh-spinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
-                                    Refresh
+                                <div class="mb-3">
+                                    <div class="text-muted">Approve USDC spending to the Morpho contract before repaying the loan.</div>
+                                </div>
+                                <button id="approve-usdc-btn" class="btn btn-success btn-lg w-100" disabled>
+                                    <span class="loading-spinner spinner-border spinner-border-sm me-2" role="status"></span>
+                                    Approve USDC Spending
                                 </button>
                             </div>
                         </div>
-                        
-                        <div class="mb-3">
-                            <div class="alert alert-secondary">
-                                <strong>Step 2:</strong> Enter repayment amount after confirming loan balance
+
+                        <!-- Step 4: Repay Loan -->
+                        <div class="card step-card step-disabled mb-4" id="step4-card" style="display: none;">
+                            <div class="card-body">
+                                <div class="step-header mb-3">
+                                    <div class="step-number step-pending" id="step4-number">4</div>
+                                    <div>Repay Loan</div>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="text-muted">Execute the loan repayment with your approved USDC.</div>
+                                </div>
+                                <button id="repay-loan-btn" class="btn btn-primary btn-lg w-100" disabled>
+                                    <span id="repay-spinner" class="spinner-border spinner-border-sm me-2" role="status" style="display: none;"></span>
+                                    Repay Loan
+                                </button>
                             </div>
                         </div>
 
-                        <div class="mb-3">
-                            <label for="repay-amount" class="form-label fw-bold">Repayment Amount (USD)</label>
-                            <div class="input-group">
-                                <span class="input-group-text">$</span>
-                                <input type="number" class="form-control" id="repay-amount" placeholder="0.00" min="0" step="0.01" disabled>
-                            </div>
-                            <div class="conversion-display mt-1" id="usdc-conversion">0 USDC</div>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <div class="alert alert-warning">
-                                <strong>Step 3:</strong> Approve USDC spending to the Morpho contract
-                            </div>
-                        </div>
-
-                        <button id="approve-usdc-btn" class="btn btn-success btn-lg w-100 mb-3" disabled>
-                            <span class="loading-spinner spinner-border spinner-border-sm me-2" role="status"></span>
-                            Approve USDC Spending
-                        </button>
-
-                        <div class="mb-3" id="repay-step-section" style="display: none;">
-                            <div class="alert alert-success">
-                                <strong>Step 4:</strong> Repay the loan with approved USDC
-                            </div>
-                        </div>
-
-                        <button id="repay-loan-btn" class="btn btn-primary btn-lg w-100" disabled style="display: none;">
-                            <span id="repay-spinner" class="spinner-border spinner-border-sm me-2" role="status" style="display: none;"></span>
-                            Repay Loan
-                        </button>
                     </div>
                 </div>
             </div>
@@ -256,9 +319,24 @@
         const $repayAmountInput = $('#repay-amount');
         const $usdcConversion = $('#usdc-conversion');
         const $approveUsdcBtn = $('#approve-usdc-btn');
-        const $repayStepSection = $('#repay-step-section');
         const $repayLoanBtn = $('#repay-loan-btn');
         const $repaySpinner = $('#repay-spinner');
+        
+        // Step Elements
+        const $step1Card = $('#step1-card');
+        const $step1Number = $('#step1-number');
+        const $step2Card = $('#step2-card');
+        const $step2Number = $('#step2-number');
+        const $step3Card = $('#step3-card');
+        const $step3Number = $('#step3-number');
+        const $step4Card = $('#step4-card');
+        const $step4Number = $('#step4-number');
+
+        // Initialize wallet address if provided in URL
+        const walletAddress = urlParams.get('wallet_address');
+        if (walletAddress && walletAddress.length === 42 && walletAddress.startsWith('0x')) {
+            $borrowerAddressInput.val(walletAddress);
+        }
 
         // jQuery Event Listeners
         $connectWalletBtn.on('click', connectWallet);
@@ -268,6 +346,81 @@
         $repayAmountInput.on('input', updateConversion);
         $approveUsdcBtn.on('click', approveUSDC);
         $repayLoanBtn.on('click', repayLoan);
+
+        // Trigger address input handling if wallet address was pre-populated
+        if (walletAddress) {
+            // Wait a bit for everything to initialize, then trigger address handling
+            setTimeout(() => {
+                handleAddressInput();
+            }, 100);
+        }
+
+        // Step Management Functions
+        function setStepState(stepNum, state) {
+            const $card = $(`#step${stepNum}-card`);
+            const $number = $(`#step${stepNum}-number`);
+            
+            // Remove all state classes
+            $card.removeClass('step-active step-completed step-disabled');
+            $number.removeClass('step-active step-completed step-pending');
+            
+            // Add new state classes
+            switch (state) {
+                case 'active':
+                    $card.addClass('step-active');
+                    $number.addClass('step-active');
+                    break;
+                case 'completed':
+                    $card.addClass('step-completed');
+                    $number.addClass('step-completed');
+                    break;
+                case 'disabled':
+                    $card.addClass('step-disabled');
+                    $number.addClass('step-pending');
+                    break;
+            }
+        }
+
+        function enableStep(stepNum) {
+            setStepState(stepNum, 'active');
+            
+            // Enable relevant form elements
+            switch (stepNum) {
+                case 2:
+                    $repayAmountInput.prop('disabled', false);
+                    break;
+                case 3:
+                    $approveUsdcBtn.prop('disabled', false);
+                    break;
+                case 4:
+                    $step4Card.show();
+                    $repayLoanBtn.prop('disabled', false);
+                    break;
+            }
+        }
+
+        function completeStep(stepNum) {
+            setStepState(stepNum, 'completed');
+            
+            // Auto-enable next step
+            if (stepNum < 4) {
+                enableStep(stepNum + 1);
+            }
+        }
+
+        function resetSteps() {
+            // Reset all steps to disabled except step 1
+            setStepState(1, 'active');
+            setStepState(2, 'disabled');
+            setStepState(3, 'disabled');
+            setStepState(4, 'disabled');
+            
+            // Hide step 4 and disable inputs
+            $step4Card.hide();
+            $repayAmountInput.prop('disabled', true);
+            $approveUsdcBtn.prop('disabled', true);
+            $repayLoanBtn.prop('disabled', true);
+        }
 
         // Connect Wallet Function
         async function connectWallet() {
@@ -363,7 +516,8 @@
             $walletConnected.removeClass('d-none');
             $repaymentSection.show();
             
-            $walletAddress.text(`${userAddress.slice(0, 6)}...${userAddress.slice(-4)}`);
+            const shortAddress = `${userAddress.slice(0, 6)}...${userAddress.slice(-4)}`;
+            $walletAddress.html(`<a href="https://basescan.org/address/${userAddress}" target="_blank" class="text-decoration-none">${shortAddress}</a>`);
             $networkStatus.html('<span class="badge bg-success">Base Network</span>');
         }
 
@@ -391,8 +545,8 @@
                     $loanBalance.text('Loading...');
                     await updateLoanBalance(address);
                     
-                    // Enable repayment amount input
-                    $repayAmountInput.prop('disabled', false);
+                    // Complete step 1 and enable step 2
+                    completeStep(1);
                     updateConversion(); // Update button state
                 } catch (error) {
                     console.error('Address validation error:', error);
@@ -400,11 +554,11 @@
                     updateConversion(); // Update button state
                 }
             } else {
-                // Hide loan balance section and disable repayment amount
+                // Hide loan balance section and reset steps
                 $loanBalanceSection.hide();
-                $repayAmountInput.prop('disabled', true);
                 $repayAmountInput.val('');
                 $usdcConversion.text('0 USDC');
+                resetSteps();
                 updateConversion(); // Update button state
             }
         }
@@ -448,10 +602,24 @@
             const usdcAmount = dollarAmount * Math.pow(10, USDC_DECIMALS);
             $usdcConversion.text(`${dollarAmount.toFixed(6)} USDC`);
             
-            // Enable/disable approve button - require valid address, loan balance, amount, and connected wallet
+            // Check if step 2 should be completed (valid amount entered)
             const hasValidAddress = $borrowerAddressInput.val().trim().length === 42 && $borrowerAddressInput.val().trim().startsWith('0x');
             const hasLoanBalance = $loanBalanceSection.is(':visible') && !$loanBalance.text().includes('Error');
-            $approveUsdcBtn.prop('disabled', dollarAmount <= 0 || !userAddress || !hasValidAddress || !hasLoanBalance);
+            const hasValidAmount = dollarAmount > 0;
+            
+            if (hasValidAddress && hasLoanBalance && hasValidAmount) {
+                // Complete step 2 and enable step 3
+                completeStep(2);
+                
+                // Enable approve button if wallet is connected
+                if (userAddress) {
+                    $approveUsdcBtn.prop('disabled', false);
+                }
+            } else if (hasValidAddress && hasLoanBalance) {
+                // Step 1 completed, step 2 active but not completed
+                setStepState(2, 'active');
+                $approveUsdcBtn.prop('disabled', true);
+            }
         }
 
         // Approve USDC Spending
@@ -497,10 +665,8 @@
                         footer: `<a href="https://basescan.org/tx/${receipt.hash}" target="_blank">View on BaseScan</a>`
                     });
 
-                    // Enable repay functionality
-                    $repayStepSection.show();
-                    $repayLoanBtn.show();
-                    $repayLoanBtn.prop('disabled', false);
+                    // Complete step 3 and enable step 4
+                    completeStep(3);
                 } else {
                     throw new Error('Transaction failed');
                 }
@@ -599,11 +765,15 @@
                     // Refresh loan balance to show updated amount
                     await updateLoanBalance();
                     
-                    // Reset form
-                    $repayAmountInput.val('');
-                    $usdcConversion.text('0 USDC');
-                    $repayStepSection.hide();
-                    $repayLoanBtn.hide();
+                    // Complete step 4 and reset form
+                    completeStep(4);
+                    
+                    // Reset form after a delay to show completion
+                    setTimeout(() => {
+                        $repayAmountInput.val('');
+                        $usdcConversion.text('0 USDC');
+                        resetSteps();
+                    }, 2000);
                     
                     // Refresh USDC balance
                     await updateBalance();
@@ -650,18 +820,13 @@
             $networkStatus.text('Checking...');
             $usdcBalance.text('Loading...');
             
-            // Clear repayment form
+            // Clear repayment form and reset steps
             $borrowerAddressInput.val('');
             $loanBalanceSection.hide();
             $loanBalance.text('Loading...');
             $repayAmountInput.val('');
-            $repayAmountInput.prop('disabled', true);
             $usdcConversion.text('0 USDC');
-            
-            // Hide repay button and step
-            $repayStepSection.hide();
-            $repayLoanBtn.hide();
-            $repayLoanBtn.prop('disabled', true);
+            resetSteps();
         }
 
         // Handle account changes
