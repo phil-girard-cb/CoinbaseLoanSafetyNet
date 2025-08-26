@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Repay Loan - Loan Safety Net</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/ethers@6.8.0/dist/ethers.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         .hero-section {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -15,6 +17,21 @@
             font-family: 'Courier New', monospace;
             font-size: 0.9em;
             word-break: break-all;
+        }
+        .wallet-address {
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        .balance-display {
+            font-weight: bold;
+            color: #28a745;
+        }
+        .conversion-display {
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+        .loading-spinner {
+            display: none;
         }
     </style>
 </head>
@@ -70,12 +87,65 @@
                     </div>
                 </div>
 
+                <!-- Wallet Connection Section -->
                 <div class="card mt-4">
                     <div class="card-header">
-                        <h3 class="mb-0">Repayment</h3>
+                        <h3 class="mb-0">Wallet Connection</h3>
                     </div>
                     <div class="card-body">
-                        <p class="text-muted">Repayment functionality will be implemented here.</p>
+                        <div id="wallet-disconnected" class="text-center">
+                            <p class="text-muted mb-3">Connect your wallet to proceed with repayment</p>
+                            <button id="connect-wallet-btn" class="btn btn-primary btn-lg">Connect Wallet</button>
+                        </div>
+                        <div id="wallet-connected" class="d-none">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Connected Address:</label>
+                                    <div class="wallet-address" id="wallet-address">Not connected</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Network:</label>
+                                    <div id="network-status">Checking...</div>
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">USDC Balance:</label>
+                                    <div class="balance-display" id="usdc-balance">Loading...</div>
+                                </div>
+                                <div class="col-md-6 text-end">
+                                    <button id="disconnect-wallet-btn" class="btn btn-outline-secondary">Disconnect</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Repayment Section -->
+                <div class="card mt-4" id="repayment-section" style="display: none;">
+                    <div class="card-header">
+                        <h3 class="mb-0">Repay Loan</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="repay-amount" class="form-label fw-bold">Repayment Amount (USD)</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" id="repay-amount" placeholder="0.00" min="0" step="0.01">
+                            </div>
+                            <div class="conversion-display mt-1" id="usdc-conversion">0 USDC</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <div class="alert alert-info">
+                                <strong>Step 1:</strong> Approve USDC spending to the Morpho contract
+                            </div>
+                        </div>
+
+                        <button id="approve-usdc-btn" class="btn btn-success btn-lg w-100" disabled>
+                            <span class="loading-spinner spinner-border spinner-border-sm me-2" role="status"></span>
+                            Approve USDC Spending
+                        </button>
                     </div>
                 </div>
             </div>
@@ -92,6 +162,265 @@
         document.getElementById('oracle').textContent = urlParams.get('oracle') || 'Not specified';
         document.getElementById('irm').textContent = urlParams.get('irm') || 'Not specified';
         document.getElementById('lltv').textContent = urlParams.get('lltv') || 'Not specified';
+
+        // Web3 Configuration
+        const BASE_CHAIN_ID = 8453;
+        const USDC_ADDRESS = urlParams.get('loan_token') || '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
+        const MORPHO_ADDRESS = '0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb';
+        const USDC_DECIMALS = 6;
+
+        // Global variables
+        let provider = null;
+        let signer = null;
+        let userAddress = null;
+        let usdcContract = null;
+
+        // USDC ABI for approve and balanceOf functions
+        const USDC_ABI = [
+            "function approve(address spender, uint256 amount) external returns (bool)",
+            "function balanceOf(address account) external view returns (uint256)",
+            "function decimals() external view returns (uint8)"
+        ];
+
+        // DOM Elements
+        const connectWalletBtn = document.getElementById('connect-wallet-btn');
+        const disconnectWalletBtn = document.getElementById('disconnect-wallet-btn');
+        const walletDisconnected = document.getElementById('wallet-disconnected');
+        const walletConnected = document.getElementById('wallet-connected');
+        const walletAddress = document.getElementById('wallet-address');
+        const networkStatus = document.getElementById('network-status');
+        const usdcBalance = document.getElementById('usdc-balance');
+        const repaymentSection = document.getElementById('repayment-section');
+        const repayAmountInput = document.getElementById('repay-amount');
+        const usdcConversion = document.getElementById('usdc-conversion');
+        const approveUsdcBtn = document.getElementById('approve-usdc-btn');
+
+        // Event Listeners
+        connectWalletBtn.addEventListener('click', connectWallet);
+        disconnectWalletBtn.addEventListener('click', disconnectWallet);
+        repayAmountInput.addEventListener('input', updateConversion);
+        approveUsdcBtn.addEventListener('click', approveUSDC);
+
+        // Connect Wallet Function
+        async function connectWallet() {
+            try {
+                if (!window.ethereum) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'MetaMask Not Found',
+                        text: 'Please install MetaMask to continue',
+                    });
+                    return;
+                }
+
+                provider = new ethers.BrowserProvider(window.ethereum);
+                await provider.send("eth_requestAccounts", []);
+                signer = await provider.getSigner();
+                userAddress = await signer.getAddress();
+
+                // Check network
+                const network = await provider.getNetwork();
+                if (Number(network.chainId) !== BASE_CHAIN_ID) {
+                    await switchToBase();
+                    return;
+                }
+
+                // Initialize USDC contract
+                usdcContract = new ethers.Contract(USDC_ADDRESS, USDC_ABI, signer);
+
+                // Update UI
+                updateWalletUI();
+                await updateBalance();
+
+            } catch (error) {
+                console.error('Wallet connection error:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Connection Failed',
+                    text: error.message || 'Failed to connect wallet',
+                });
+            }
+        }
+
+        // Switch to Base Network
+        async function switchToBase() {
+            try {
+                await window.ethereum.request({
+                    method: 'wallet_switchEthereumChain',
+                    params: [{ chainId: '0x2105' }], // Base chainId in hex
+                });
+                // Retry connection after network switch
+                setTimeout(connectWallet, 1000);
+            } catch (error) {
+                if (error.code === 4902) {
+                    // Network not added, add it
+                    try {
+                        await window.ethereum.request({
+                            method: 'wallet_addEthereumChain',
+                            params: [{
+                                chainId: '0x2105',
+                                chainName: 'Base',
+                                nativeCurrency: {
+                                    name: 'Ethereum',
+                                    symbol: 'ETH',
+                                    decimals: 18
+                                },
+                                rpcUrls: ['https://mainnet.base.org'],
+                                blockExplorerUrls: ['https://basescan.org']
+                            }]
+                        });
+                        setTimeout(connectWallet, 1000);
+                    } catch (addError) {
+                        console.error('Error adding Base network:', addError);
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Network Error',
+                            text: 'Please manually switch to Base network in your wallet',
+                        });
+                    }
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Network Switch Failed',
+                        text: 'Please manually switch to Base network in your wallet',
+                    });
+                }
+            }
+        }
+
+        // Update Wallet UI
+        function updateWalletUI() {
+            walletDisconnected.classList.add('d-none');
+            walletConnected.classList.remove('d-none');
+            repaymentSection.style.display = 'block';
+            
+            walletAddress.textContent = `${userAddress.slice(0, 6)}...${userAddress.slice(-4)}`;
+            networkStatus.innerHTML = '<span class="badge bg-success">Base Network</span>';
+        }
+
+        // Update USDC Balance
+        async function updateBalance() {
+            try {
+                const balance = await usdcContract.balanceOf(userAddress);
+                const balanceFormatted = ethers.formatUnits(balance, USDC_DECIMALS);
+                usdcBalance.textContent = `$${parseFloat(balanceFormatted).toFixed(2)}`;
+            } catch (error) {
+                console.error('Balance update error:', error);
+                usdcBalance.textContent = 'Error loading balance';
+            }
+        }
+
+        // Update Conversion Display
+        function updateConversion() {
+            const dollarAmount = parseFloat(repayAmountInput.value) || 0;
+            const usdcAmount = dollarAmount * Math.pow(10, USDC_DECIMALS);
+            usdcConversion.textContent = `${dollarAmount.toFixed(6)} USDC`;
+            
+            // Enable/disable approve button
+            approveUsdcBtn.disabled = dollarAmount <= 0 || !userAddress;
+        }
+
+        // Approve USDC Spending
+        async function approveUSDC() {
+            try {
+                const dollarAmount = parseFloat(repayAmountInput.value);
+                if (!dollarAmount || dollarAmount <= 0) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Invalid Amount',
+                        text: 'Please enter a valid repayment amount',
+                    });
+                    return;
+                }
+
+                // Convert to USDC units (6 decimals)
+                const usdcAmount = ethers.parseUnits(dollarAmount.toString(), USDC_DECIMALS);
+
+                // Show loading state
+                approveUsdcBtn.disabled = true;
+                document.querySelector('.loading-spinner').style.display = 'inline-block';
+                approveUsdcBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Approving...';
+
+                // Execute approval transaction
+                const tx = await usdcContract.approve(MORPHO_ADDRESS, usdcAmount);
+                
+                Swal.fire({
+                    icon: 'info',
+                    title: 'Transaction Submitted',
+                    text: 'Please wait for confirmation...',
+                    showConfirmButton: false,
+                    timer: 3000
+                });
+
+                // Wait for transaction confirmation
+                const receipt = await tx.wait();
+
+                if (receipt.status === 1) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Approval Successful!',
+                        text: `Successfully approved $${dollarAmount.toFixed(2)} USDC spending`,
+                        footer: `<a href="https://basescan.org/tx/${receipt.hash}" target="_blank">View on BaseScan</a>`
+                    });
+                } else {
+                    throw new Error('Transaction failed');
+                }
+
+            } catch (error) {
+                console.error('Approval error:', error);
+                let errorMessage = 'Approval transaction failed';
+                
+                if (error.code === 4001) {
+                    errorMessage = 'Transaction rejected by user';
+                } else if (error.message) {
+                    errorMessage = error.message;
+                }
+
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Approval Failed',
+                    text: errorMessage,
+                });
+            } finally {
+                // Reset button state
+                approveUsdcBtn.disabled = false;
+                document.querySelector('.loading-spinner').style.display = 'none';
+                approveUsdcBtn.innerHTML = '<span class="loading-spinner spinner-border spinner-border-sm me-2" role="status"></span>Approve USDC Spending';
+            }
+        }
+
+        // Disconnect Wallet
+        function disconnectWallet() {
+            provider = null;
+            signer = null;
+            userAddress = null;
+            usdcContract = null;
+
+            walletConnected.classList.add('d-none');
+            walletDisconnected.classList.remove('d-none');
+            repaymentSection.style.display = 'none';
+
+            walletAddress.textContent = 'Not connected';
+            networkStatus.textContent = 'Checking...';
+            usdcBalance.textContent = 'Loading...';
+            repayAmountInput.value = '';
+            usdcConversion.textContent = '0 USDC';
+        }
+
+        // Handle account changes
+        if (window.ethereum) {
+            window.ethereum.on('accountsChanged', (accounts) => {
+                if (accounts.length === 0) {
+                    disconnectWallet();
+                } else if (userAddress && accounts[0] !== userAddress) {
+                    connectWallet();
+                }
+            });
+
+            window.ethereum.on('chainChanged', () => {
+                window.location.reload();
+            });
+        }
     </script>
 </body>
 </html>
