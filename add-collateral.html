@@ -412,10 +412,8 @@
             }
         ];
 
-        // Helper contract ABI for collateral functions
-        const HELPER_ABI = [
-            "function position(tuple(address loanToken, address collateralToken, address oracle, address irm, uint256 lltv) marketParams, address user) external view returns (uint256 supplyShares, uint128 borrowShares, uint128 collateral)"
-        ];
+        // Helper contract ABI (not used in current implementation)
+        const HELPER_ABI = [];
 
         // jQuery DOM Elements
         const $connectWalletBtn = $('#connect-wallet-btn');
@@ -734,16 +732,16 @@
                 };
 
                 // Fetch position data
-                const position = await helperContract.position(marketParams, addressToCheck);
+                const position = await morphoContract.position(MARKET_ID, addressToCheck);
 
                 // Format collateral balance
                 const collateralFormatted = ethers.formatUnits(position.collateral, TOKEN_DECIMALS);
                 const symbol = await collateralContract.symbol();
                 $currentCollateral.text(`${parseFloat(collateralFormatted).toFixed(TOKEN_DECIMALS === 8 ? 8 : 6)} ${symbol}`);
                 
-                // Display share balance (supply shares for collateral)
+                // Display supply shares for collateral
                 const supplyShares = position.supplyShares;
-                $currentCollateralShares.text(`${supplyShares.toString()} shares`);
+                $currentCollateralShares.text(`${supplyShares.toString()} supply shares`);
                 
             } catch (error) {
                 console.error('Collateral balance update error:', error);
