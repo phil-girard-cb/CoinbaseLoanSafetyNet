@@ -278,7 +278,6 @@
                                             </div>
                                             <div class="col-6">
                                                 <div class="text-muted" id="final-collateral-balance">Loading...</div>
-                                                <div class="small text-muted" id="final-collateral-shares">Loading shares...</div>
                                             </div>
                                         </div>
                                     </div>
@@ -425,7 +424,6 @@
         const $borrowerAddressInput = $('#borrower-address');
         const $collateralBalanceSection = $('#collateral-balance-section');
         const $currentCollateral = $('#current-collateral');
-        const $currentCollateralShares = $('#current-collateral-shares');
         const $refreshBalanceBtn = $('#refresh-balance-btn');
         const $refreshSpinner = $('#refresh-spinner');
         const $collateralSection = $('#collateral-section');
@@ -448,7 +446,6 @@
         const $step5Card = $('#step5-card');
         const $step5Number = $('#step5-number');
         const $finalCollateralBalance = $('#final-collateral-balance');
-        const $finalCollateralShares = $('#final-collateral-shares');
         const $startNewSupplyBtn = $('#start-new-supply-btn');
 
         // Initialize wallet address if provided in URL
@@ -552,7 +549,6 @@
             $borrowerAddressInput.val('');
             $collateralBalanceSection.hide();
             $currentCollateral.text('Loading...');
-            $currentCollateralShares.text('Loading shares...');
             $collateralAmountInput.val('');
             $tokenConversion.text('0 tokens');
             resetSteps();
@@ -690,8 +686,7 @@
                     // Show collateral balance section and fetch balance
                     $collateralBalanceSection.show();
                     $currentCollateral.text('Loading...');
-                    $currentCollateralShares.text('Loading shares...');
-                    await updateCollateralBalance(address);
+                            await updateCollateralBalance(address);
                     
                     // Complete step 1 and enable step 2
                     completeStep(1);
@@ -699,7 +694,6 @@
                 } catch (error) {
                     console.error('Address validation error:', error);
                     $currentCollateral.text('Error loading collateral balance');
-                    $currentCollateralShares.text('Error loading shares');
                     updateConversion(); // Update button state
                 }
             } else {
@@ -738,14 +732,9 @@
                 const symbol = await collateralContract.symbol();
                 $currentCollateral.text(`${parseFloat(collateralFormatted).toFixed(TOKEN_DECIMALS === 8 ? 8 : 6)} ${symbol}`);
                 
-                // Display supply shares for collateral
-                const supplyShares = position.supplyShares;
-                $currentCollateralShares.text(`${supplyShares.toString()} supply shares`);
-                
             } catch (error) {
                 console.error('Collateral balance update error:', error);
                 $currentCollateral.text('Error loading collateral balance');
-                $currentCollateralShares.text('Error loading shares');
             }
         }
 
@@ -938,9 +927,7 @@
                     
                     // Update final collateral balance display
                     const finalCollateralBalance = $currentCollateral.text();
-                    const finalSharesBalance = $currentCollateralShares.text();
                     $finalCollateralBalance.text(finalCollateralBalance);
-                    $finalCollateralShares.text(finalSharesBalance);
                     
                     // Refresh token balance
                     await updateBalance();
@@ -992,7 +979,6 @@
             $borrowerAddressInput.val('');
             $collateralBalanceSection.hide();
             $currentCollateral.text('Loading...');
-            $currentCollateralShares.text('Loading shares...');
             $collateralAmountInput.val('');
             $tokenConversion.text('0 tokens');
             resetSteps();
