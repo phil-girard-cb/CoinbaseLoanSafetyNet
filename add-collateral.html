@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Collateral - Loan Safety Net</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ethers@6.8.0/dist/ethers.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        .hero-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 3rem 0;
+        }
+        .param-value {
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            word-break: break-all;
+        }
+        .wallet-address {
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        .balance-display {
+            font-weight: bold;
+            color: #28a745;
+        }
+        .conversion-display {
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+        .loading-spinner {
+            display: none;
+        }
+        .step-card {
+            transition: all 0.3s ease;
+            border: 2px solid #e9ecef;
+        }
+        .step-card.step-active {
+            border-color: #0d6efd;
+            box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+        }
+        .step-card.step-completed {
+            border-color: #198754;
+            background-color: #f8fff9;
+        }
+        .step-card.step-disabled {
+            background-color: #f8f9fa;
+            opacity: 0.6;
+        }
+        .step-header {
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .step-number {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .step-number.step-pending {
+            background-color: #e9ecef;
+            color: #6c757d;
+        }
+        .step-number.step-active {
+            background-color: #0d6efd;
+            color: white;
+        }
+        .step-number.step-completed {
+            background-color: #198754;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="hero-section">
+        <div class="container">
+            <h1 class="display-5 text-center mb-3">Add Collateral</h1>
+            <p class="lead text-center">Connect your wallet to add collateral to this Morpho loan</p>
+        </div>
+    </div>
+
+    <div class="container mt-5">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="index.html">Home</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">Add Collateral</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="mb-0">Market Details</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Loan Token:</label>
+                                <div class="param-value" id="loan-token">Loading...</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Collateral Token:</label>
+                                <div class="param-value" id="collateral-token">Loading...</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Oracle:</label>
+                                <div class="param-value" id="oracle">Loading...</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">IRM:</label>
+                                <div class="param-value" id="irm">Loading...</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">LLTV:</label>
+                                <div class="param-value" id="lltv">Loading...</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Market ID:</label>
+                                <div class="param-value" id="market-id">Loading...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Wallet Connection Section -->
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h3 class="mb-0">Wallet Connection</h3>
+                    </div>
+                    <div class="card-body">
+                        <div id="wallet-disconnected" class="text-center">
+                            <p class="text-muted mb-3">Connect your wallet to proceed with adding collateral</p>
+                            <button id="connect-wallet-btn" class="btn btn-primary btn-lg">Connect Wallet</button>
+                        </div>
+                        <div id="wallet-connected" class="d-none">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Connected Address:</label>
+                                    <div class="wallet-address" id="wallet-address">Not connected</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Network:</label>
+                                    <div id="network-status">Checking...</div>
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Collateral Balance:</label>
+                                    <div class="balance-display" id="collateral-balance">Loading...</div>
+                                </div>
+                                <div class="col-md-6 text-end">
+                                    <button id="disconnect-wallet-btn" class="btn btn-outline-secondary">Disconnect</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Add Collateral Section -->
+                <div class="card mt-4" id="collateral-section" style="display: none;">
+                    <div class="card-header">
+                        <h3 class="mb-0">Add Collateral</h3>
+                    </div>
+                    <div class="card-body">
+                        
+                        <!-- Step 1: Enter Loan Address -->
+                        <div class="card step-card step-active mb-4" id="step1-card">
+                            <div class="card-body">
+                                <div class="step-header mb-3">
+                                    <div class="step-number step-active" id="step1-number">1</div>
+                                    <div>Enter Loan Address</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="borrower-address" class="form-label fw-bold">Loan Address</label>
+                                    <input type="text" class="form-control" id="borrower-address" placeholder="0x..." maxlength="42">
+                                    <div class="form-text">Enter the Ethereum address to add collateral for</div>
+                                </div>
+                                <div class="mb-3" id="collateral-balance-section" style="display: none;">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div class="flex-grow-1">
+                                            <label class="form-label fw-bold">Current Collateral:</label>
+                                            <div class="balance-display text-muted" id="current-collateral">Loading...</div>
+                                        </div>
+                                        <button id="refresh-balance-btn" class="btn btn-sm btn-outline-primary">
+                                            <span id="refresh-spinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
+                                            Refresh
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Step 2: Enter Collateral Amount -->
+                        <div class="card step-card step-disabled mb-4" id="step2-card">
+                            <div class="card-body">
+                                <div class="step-header mb-3">
+                                    <div class="step-number step-pending" id="step2-number">2</div>
+                                    <div>Enter Collateral Amount</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="collateral-amount" class="form-label fw-bold">Collateral Amount</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" id="collateral-amount" placeholder="0.00" min="0" step="any" disabled>
+                                        <span class="input-group-text" id="token-symbol">TOKEN</span>
+                                    </div>
+                                    <div class="conversion-display mt-1" id="token-conversion">0 tokens</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Step 3: Approve Collateral Token -->
+                        <div class="card step-card step-disabled mb-4" id="step3-card">
+                            <div class="card-body">
+                                <div class="step-header mb-3">
+                                    <div class="step-number step-pending" id="step3-number">3</div>
+                                    <div>Approve Collateral Token Spending</div>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="text-muted">Approve collateral token spending to the Morpho contract before adding collateral.</div>
+                                </div>
+                                <button id="approve-token-btn" class="btn btn-success btn-lg w-100" disabled>
+                                    <span class="loading-spinner spinner-border spinner-border-sm me-2" role="status"></span>
+                                    Approve Token Spending
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Step 4: Supply Collateral -->
+                        <div class="card step-card step-disabled mb-4" id="step4-card" style="display: none;">
+                            <div class="card-body">
+                                <div class="step-header mb-3">
+                                    <div class="step-number step-pending" id="step4-number">4</div>
+                                    <div>Supply Collateral</div>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="text-muted">Execute the collateral supply with your approved tokens.</div>
+                                </div>
+                                <button id="supply-collateral-btn" class="btn btn-primary btn-lg w-100" disabled>
+                                    <span id="supply-spinner" class="spinner-border spinner-border-sm me-2" role="status" style="display: none;"></span>
+                                    Supply Collateral
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Step 5: Completion -->
+                        <div class="card step-card step-disabled mb-4" id="step5-card" style="display: none;">
+                            <div class="card-body">
+                                <div class="step-header mb-3">
+                                    <div class="step-number step-pending" id="step5-number">5</div>
+                                    <div>Collateral Added Successfully!</div>
+                                </div>
+                                <div class="text-center">
+                                    <div class="mb-3">
+                                        <i class="bi bi-check-circle-fill text-success" style="font-size: 3rem;"></i>
+                                    </div>
+                                    <h4 class="text-success mb-3">🎉 Congratulations!</h4>
+                                    <p class="mb-3">Your collateral has been successfully added to the position.</p>
+                                    
+                                    <div class="alert alert-success">
+                                        <div class="row">
+                                            <div class="col-6">
+                                                <strong>Updated Collateral Balance:</strong>
+                                            </div>
+                                            <div class="col-6">
+                                                <div class="text-muted" id="final-collateral-balance">Loading...</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <button id="start-new-supply-btn" class="btn btn-primary btn-lg">
+                                        Add More Collateral
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            // Parse URL parameters and display them
+            const urlParams = new URLSearchParams(window.location.search);
+            
+            $('#loan-token').text(urlParams.get('loan_token') || 'Not specified');
+            $('#collateral-token').text(urlParams.get('collateral_token') || 'Not specified');
+            $('#oracle').text(urlParams.get('oracle') || 'Not specified');
+            $('#irm').text(urlParams.get('irm') || 'Not specified');
+            $('#lltv').text(urlParams.get('lltv') || 'Not specified');
+            $('#market-id').text(urlParams.get('market_id') || 'Not specified');
+
+        // Web3 Configuration
+        const BASE_CHAIN_ID = 8453;
+        const COLLATERAL_ADDRESS = urlParams.get('collateral_token') || '0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf';
+        const MORPHO_ADDRESS = '0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb'; // Morpho Blue on Base
+        const HELPER_ADDRESS = '0x4900846ffafd75627d6e1de392a46042831a8962';
+        
+        console.log('Using Morpho address:', MORPHO_ADDRESS);
+        console.log('Using collateral token:', COLLATERAL_ADDRESS);
+        const MARKET_ID = urlParams.get('market_id') || '0x9103c3b4e834476c9a62ea009ba2c884ee42e94e6e314a26f04d312434191836';
+        
+        // Get token decimals from URL parameter, default to 8 for cbBTC
+        const TOKEN_DECIMALS = parseInt(urlParams.get('collateral_decimal') || '8');
+
+        // Global variables
+        let provider = null;
+        let signer = null;
+        let userAddress = null;
+        let collateralContract = null;
+        let morphoContract = null;
+        let helperContract = null;
+
+        // ERC20 ABI for approve, balanceOf, decimals, symbol, allowance, and transfer functions
+        const ERC20_ABI = [
+            "function approve(address spender, uint256 amount) external returns (bool)",
+            "function balanceOf(address account) external view returns (uint256)",
+            "function decimals() external view returns (uint8)",
+            "function symbol() external view returns (string)",
+            "function allowance(address owner, address spender) external view returns (uint256)",
+            "function transfer(address to, uint256 amount) external returns (bool)"
+        ];
+
+        // Morpho ABI for position and supplyCollateral functions
+        const MORPHO_ABI = [
+            "function position(bytes32 id, address user) external view returns (uint256 supplyShares, uint128 borrowShares, uint128 collateral)",
+            "function supplyCollateral(tuple(address loanToken, address collateralToken, address oracle, address irm, uint256 lltv) marketParams, uint256 assets, address onBehalf, bytes data) external"
+        ];
+
+        // Helper contract ABI (not used in current implementation)
+        const HELPER_ABI = [];
+
+        // jQuery DOM Elements
+        const $connectWalletBtn = $('#connect-wallet-btn');
+        const $disconnectWalletBtn = $('#disconnect-wallet-btn');
+        const $walletDisconnected = $('#wallet-disconnected');
+        const $walletConnected = $('#wallet-connected');
+        const $walletAddress = $('#wallet-address');
+        const $networkStatus = $('#network-status');
+        const $collateralBalance = $('#collateral-balance');
+        const $borrowerAddressInput = $('#borrower-address');
+        const $collateralBalanceSection = $('#collateral-balance-section');
+        const $currentCollateral = $('#current-collateral');
+        const $refreshBalanceBtn = $('#refresh-balance-btn');
+        const $refreshSpinner = $('#refresh-spinner');
+        const $collateralSection = $('#collateral-section');
+        const $collateralAmountInput = $('#collateral-amount');
+        const $tokenSymbol = $('#token-symbol');
+        const $tokenConversion = $('#token-conversion');
+        const $approveTokenBtn = $('#approve-token-btn');
+        const $supplyCollateralBtn = $('#supply-collateral-btn');
+        const $supplySpinner = $('#supply-spinner');
+        
+        // Step Elements
+        const $step1Card = $('#step1-card');
+        const $step1Number = $('#step1-number');
+        const $step2Card = $('#step2-card');
+        const $step2Number = $('#step2-number');
+        const $step3Card = $('#step3-card');
+        const $step3Number = $('#step3-number');
+        const $step4Card = $('#step4-card');
+        const $step4Number = $('#step4-number');
+        const $step5Card = $('#step5-card');
+        const $step5Number = $('#step5-number');
+        const $finalCollateralBalance = $('#final-collateral-balance');
+        const $startNewSupplyBtn = $('#start-new-supply-btn');
+
+        // Initialize wallet address if provided in URL
+        const walletAddress = urlParams.get('wallet_address');
+        if (walletAddress && walletAddress.length === 42 && walletAddress.startsWith('0x')) {
+            $borrowerAddressInput.val(walletAddress);
+        }
+
+        // jQuery Event Listeners
+        $connectWalletBtn.on('click', connectWallet);
+        $disconnectWalletBtn.on('click', disconnectWallet);
+        $borrowerAddressInput.on('input', handleAddressInput);
+        $refreshBalanceBtn.on('click', refreshCollateralBalance);
+        $collateralAmountInput.on('input', updateConversion);
+        $approveTokenBtn.on('click', approveToken);
+        $supplyCollateralBtn.on('click', supplyCollateral);
+        $startNewSupplyBtn.on('click', startNewSupply);
+
+        // Trigger address input handling if wallet address was pre-populated
+        if (walletAddress) {
+            // Wait a bit for everything to initialize, then trigger address handling
+            setTimeout(() => {
+                handleAddressInput();
+            }, 100);
+        }
+
+        // Step Management Functions
+        function setStepState(stepNum, state) {
+            const $card = $(`#step${stepNum}-card`);
+            const $number = $(`#step${stepNum}-number`);
+            
+            // Remove all state classes
+            $card.removeClass('step-active step-completed step-disabled');
+            $number.removeClass('step-active step-completed step-pending');
+            
+            // Add new state classes
+            switch (state) {
+                case 'active':
+                    $card.addClass('step-active');
+                    $number.addClass('step-active');
+                    break;
+                case 'completed':
+                    $card.addClass('step-completed');
+                    $number.addClass('step-completed');
+                    break;
+                case 'disabled':
+                    $card.addClass('step-disabled');
+                    $number.addClass('step-pending');
+                    break;
+            }
+        }
+
+        function enableStep(stepNum) {
+            setStepState(stepNum, 'active');
+            
+            // Enable relevant form elements
+            switch (stepNum) {
+                case 2:
+                    $collateralAmountInput.prop('disabled', false);
+                    break;
+                case 3:
+                    $approveTokenBtn.prop('disabled', false);
+                    break;
+                case 4:
+                    $step4Card.show();
+                    $supplyCollateralBtn.prop('disabled', false);
+                    break;
+                case 5:
+                    $step5Card.show();
+                    break;
+            }
+        }
+
+        function completeStep(stepNum) {
+            setStepState(stepNum, 'completed');
+            
+            // Auto-enable next step
+            if (stepNum < 5) {
+                enableStep(stepNum + 1);
+            }
+        }
+
+        function resetSteps() {
+            // Reset all steps to disabled except step 1
+            setStepState(1, 'active');
+            setStepState(2, 'disabled');
+            setStepState(3, 'disabled');
+            setStepState(4, 'disabled');
+            setStepState(5, 'disabled');
+            
+            // Hide step 4 and 5, disable inputs
+            $step4Card.hide();
+            $step5Card.hide();
+            $collateralAmountInput.prop('disabled', true);
+            $approveTokenBtn.prop('disabled', true);
+            $supplyCollateralBtn.prop('disabled', true);
+        }
+
+        function startNewSupply() {
+            // Clear form and reset steps
+            $borrowerAddressInput.val('');
+            $collateralBalanceSection.hide();
+            $currentCollateral.text('Loading...');
+            $collateralAmountInput.val('');
+            $tokenConversion.text('0 tokens');
+            resetSteps();
+        }
+
+        // Connect Wallet Function
+        async function connectWallet() {
+            try {
+                if (!window.ethereum) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'MetaMask Not Found',
+                        text: 'Please install MetaMask to continue',
+                    });
+                    return;
+                }
+
+                provider = new ethers.BrowserProvider(window.ethereum);
+                await provider.send("eth_requestAccounts", []);
+                signer = await provider.getSigner();
+                userAddress = await signer.getAddress();
+
+                // Check network
+                const network = await provider.getNetwork();
+                if (Number(network.chainId) !== BASE_CHAIN_ID) {
+                    await switchToBase();
+                    return;
+                }
+
+                // Initialize contracts
+                collateralContract = new ethers.Contract(COLLATERAL_ADDRESS, ERC20_ABI, signer);
+                morphoContract = new ethers.Contract(MORPHO_ADDRESS, MORPHO_ABI, signer);
+                helperContract = new ethers.Contract(HELPER_ADDRESS, HELPER_ABI, provider);
+
+                // Update UI
+                await updateWalletUI();
+                await updateBalance();
+
+            } catch (error) {
+                console.error('Wallet connection error:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Connection Failed',
+                    text: error.message || 'Failed to connect wallet',
+                });
+            }
+        }
+
+        // Switch to Base Network
+        async function switchToBase() {
+            try {
+                await window.ethereum.request({
+                    method: 'wallet_switchEthereumChain',
+                    params: [{ chainId: '0x2105' }], // Base chainId in hex
+                });
+                // Retry connection after network switch
+                setTimeout(connectWallet, 1000);
+            } catch (error) {
+                if (error.code === 4902) {
+                    // Network not added, add it
+                    try {
+                        await window.ethereum.request({
+                            method: 'wallet_addEthereumChain',
+                            params: [{
+                                chainId: '0x2105',
+                                chainName: 'Base',
+                                nativeCurrency: {
+                                    name: 'Ethereum',
+                                    symbol: 'ETH',
+                                    decimals: 18
+                                },
+                                rpcUrls: ['https://mainnet.base.org'],
+                                blockExplorerUrls: ['https://basescan.org']
+                            }]
+                        });
+                        setTimeout(connectWallet, 1000);
+                    } catch (addError) {
+                        console.error('Error adding Base network:', addError);
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Network Error',
+                            text: 'Please manually switch to Base network in your wallet',
+                        });
+                    }
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Network Switch Failed',
+                        text: 'Please manually switch to Base network in your wallet',
+                    });
+                }
+            }
+        }
+
+        // Update Wallet UI
+        async function updateWalletUI() {
+            $walletDisconnected.addClass('d-none');
+            $walletConnected.removeClass('d-none');
+            $collateralSection.show();
+            
+            const shortAddress = `${userAddress.slice(0, 6)}...${userAddress.slice(-4)}`;
+            $walletAddress.html(`<a href="https://basescan.org/address/${userAddress}" target="_blank" class="text-decoration-none">${shortAddress}</a>`);
+            $networkStatus.html('<span class="badge bg-success">Base Network</span>');
+
+            // Update token symbol
+            try {
+                const symbol = await collateralContract.symbol();
+                $tokenSymbol.text(symbol);
+            } catch (error) {
+                console.error('Error getting token symbol:', error);
+                $tokenSymbol.text('TOKEN');
+            }
+        }
+
+        // Update Collateral Token Balance
+        async function updateBalance() {
+            try {
+                const balance = await collateralContract.balanceOf(userAddress);
+                const balanceFormatted = ethers.formatUnits(balance, TOKEN_DECIMALS);
+                const symbol = await collateralContract.symbol();
+                $collateralBalance.text(`${parseFloat(balanceFormatted).toFixed(TOKEN_DECIMALS === 8 ? 8 : 6)} ${symbol}`);
+            } catch (error) {
+                console.error('Balance update error:', error);
+                $collateralBalance.text('Error loading balance');
+            }
+        }
+
+        // Handle Address Input
+        async function handleAddressInput() {
+            const address = $borrowerAddressInput.val().trim();
+            
+            // Basic address validation
+            if (address.length === 42 && address.startsWith('0x')) {
+                try {
+                    // Show collateral balance section and fetch balance
+                    $collateralBalanceSection.show();
+                    $currentCollateral.text('Loading...');
+                            await updateCollateralBalance(address);
+                    
+                    // Complete step 1 and enable step 2
+                    completeStep(1);
+                    updateConversion(); // Update button state
+                } catch (error) {
+                    console.error('Address validation error:', error);
+                    $currentCollateral.text('Error loading collateral balance');
+                    updateConversion(); // Update button state
+                }
+            } else {
+                // Hide collateral balance section and reset steps
+                $collateralBalanceSection.hide();
+                $collateralAmountInput.val('');
+                $tokenConversion.text('0 tokens');
+                resetSteps();
+                updateConversion(); // Update button state
+            }
+        }
+
+        // Update Collateral Balance
+        async function updateCollateralBalance(targetAddress = null) {
+            try {
+                const addressToCheck = targetAddress || $borrowerAddressInput.val().trim();
+                
+                if (!addressToCheck || !morphoContract || !helperContract) {
+                    throw new Error('No address provided or contracts not initialized');
+                }
+
+                // Construct market parameters from URL params
+                const marketParams = {
+                    loanToken: urlParams.get('loan_token'),
+                    collateralToken: urlParams.get('collateral_token'),
+                    oracle: urlParams.get('oracle'),
+                    irm: urlParams.get('irm'),
+                    lltv: urlParams.get('lltv')
+                };
+
+                // Fetch position data
+                const position = await morphoContract.position(MARKET_ID, addressToCheck);
+
+                // Format collateral balance
+                const collateralFormatted = ethers.formatUnits(position.collateral, TOKEN_DECIMALS);
+                const symbol = await collateralContract.symbol();
+                $currentCollateral.text(`${parseFloat(collateralFormatted).toFixed(TOKEN_DECIMALS === 8 ? 8 : 6)} ${symbol}`);
+                
+            } catch (error) {
+                console.error('Collateral balance update error:', error);
+                $currentCollateral.text('Error loading collateral balance');
+            }
+        }
+
+        // Refresh Collateral Balance
+        async function refreshCollateralBalance() {
+            try {
+                $refreshSpinner.removeClass('d-none');
+                $refreshBalanceBtn.prop('disabled', true);
+                await updateCollateralBalance();
+                updateConversion(); // Update button state after refresh
+            } catch (error) {
+                console.error('Refresh error:', error);
+            } finally {
+                $refreshSpinner.addClass('d-none');
+                $refreshBalanceBtn.prop('disabled', false);
+            }
+        }
+
+        // Update Conversion Display
+        function updateConversion() {
+            const tokenAmount = parseFloat($collateralAmountInput.val()) || 0;
+            $tokenConversion.text(`${tokenAmount.toFixed(TOKEN_DECIMALS === 8 ? 8 : 6)} tokens`);
+            
+            // Check if step 2 should be completed (valid amount entered)
+            const hasValidAddress = $borrowerAddressInput.val().trim().length === 42 && $borrowerAddressInput.val().trim().startsWith('0x');
+            const hasValidAmount = tokenAmount > 0;
+            
+            if (hasValidAddress && hasValidAmount) {
+                // Complete step 2 and enable step 3
+                completeStep(2);
+                
+                // Enable approve button if wallet is connected
+                if (userAddress) {
+                    $approveTokenBtn.prop('disabled', false);
+                }
+            } else if (hasValidAddress) {
+                // Step 1 completed, step 2 active but not completed
+                setStepState(2, 'active');
+                $approveTokenBtn.prop('disabled', true);
+            }
+        }
+
+        // Approve Token Spending
+        async function approveToken() {
+            try {
+                const tokenAmount = parseFloat($collateralAmountInput.val());
+                if (!tokenAmount || tokenAmount <= 0) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Invalid Amount',
+                        text: 'Please enter a valid collateral amount',
+                    });
+                    return;
+                }
+
+                // Convert to token units
+                const amount = ethers.parseUnits(tokenAmount.toString(), TOKEN_DECIMALS);
+
+                // Show loading state
+                $approveTokenBtn.prop('disabled', true);
+                $('.loading-spinner').show();
+                $approveTokenBtn.html('<span class="spinner-border spinner-border-sm me-2" role="status"></span>Approving...');
+
+                console.log('Approving token spending:');
+                console.log('Token contract:', COLLATERAL_ADDRESS);
+                console.log('Spender (Morpho):', MORPHO_ADDRESS);
+                console.log('Amount:', ethers.formatUnits(amount, TOKEN_DECIMALS));
+
+                // Execute approval transaction
+                const tx = await collateralContract.approve(MORPHO_ADDRESS, amount);
+                
+                Swal.fire({
+                    icon: 'info',
+                    title: 'Transaction Submitted',
+                    text: 'Please wait for confirmation...',
+                    showConfirmButton: false,
+                    timer: 3000
+                });
+
+                // Wait for transaction confirmation
+                const receipt = await tx.wait();
+
+                if (receipt.status === 1) {
+                    // Verify the approval actually worked
+                    const newAllowance = await collateralContract.allowance(userAddress, MORPHO_ADDRESS);
+                    console.log('Approval successful! New allowance:', ethers.formatUnits(newAllowance, TOKEN_DECIMALS));
+                    
+                    const symbol = await collateralContract.symbol();
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Approval Successful!',
+                        text: `Successfully approved ${tokenAmount.toFixed(TOKEN_DECIMALS === 8 ? 8 : 6)} ${symbol} spending`,
+                        footer: `<a href="https://basescan.org/tx/${receipt.hash}" target="_blank">View on BaseScan</a>`
+                    });
+
+                    // Complete step 3 and enable step 4
+                    completeStep(3);
+                } else {
+                    throw new Error('Transaction failed');
+                }
+
+            } catch (error) {
+                console.error('Approval error:', error);
+                let errorMessage = 'Approval transaction failed';
+                
+                if (error.code === 4001) {
+                    errorMessage = 'Transaction rejected by user';
+                } else if (error.message) {
+                    errorMessage = error.message;
+                }
+
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Approval Failed',
+                    text: errorMessage,
+                });
+            } finally {
+                // Reset button state
+                $approveTokenBtn.prop('disabled', false);
+                $approveTokenBtn.html('Approve Token Spending');
+            }
+        }
+
+        // Supply Collateral Function
+        async function supplyCollateral() {
+            try {
+                const tokenAmount = parseFloat($collateralAmountInput.val());
+                const userAddressInput = $borrowerAddressInput.val().trim();
+                
+                if (!tokenAmount || tokenAmount <= 0) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Invalid Amount',
+                        text: 'Please enter a valid collateral amount',
+                    });
+                    return;
+                }
+
+                if (!userAddressInput) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Missing Address',
+                        text: 'Please enter the loan address',
+                    });
+                    return;
+                }
+
+                // Convert to token units
+                const tokenAmountUnits = ethers.parseUnits(tokenAmount.toString(), TOKEN_DECIMALS);
+
+                // Check if user has enough balance
+                const userBalance = await collateralContract.balanceOf(userAddress);
+                console.log('User balance (raw):', userBalance.toString());
+                console.log('Required amount (raw):', tokenAmountUnits.toString());
+                console.log('User balance (formatted):', ethers.formatUnits(userBalance, TOKEN_DECIMALS));
+                console.log('User address:', userAddress);
+                
+                if (userBalance < tokenAmountUnits) {
+                    const symbol = await collateralContract.symbol();
+                    const balanceFormatted = ethers.formatUnits(userBalance, TOKEN_DECIMALS);
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Insufficient Balance',
+                        text: `You only have ${parseFloat(balanceFormatted).toFixed(TOKEN_DECIMALS === 8 ? 8 : 6)} ${symbol} but are trying to supply ${tokenAmount.toFixed(TOKEN_DECIMALS === 8 ? 8 : 6)} ${symbol}`,
+                    });
+                    return;
+                }
+
+                // Check current allowance
+                const currentAllowance = await collateralContract.allowance(userAddress, MORPHO_ADDRESS);
+                console.log('Checking allowance for spender:', MORPHO_ADDRESS);
+                console.log('Current allowance (raw):', currentAllowance.toString());
+                console.log('Current allowance (formatted):', ethers.formatUnits(currentAllowance, TOKEN_DECIMALS));
+                console.log('Required amount (formatted):', ethers.formatUnits(tokenAmountUnits, TOKEN_DECIMALS));
+                
+                // Also check if there are any approvals to other common Morpho addresses
+                const morphoAddresses = [
+                    '0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb', // Main Morpho
+                    '0x38989BBA00BDF8181F4082995b3DEAe96163aC5D', // Morpho Blue on Ethereum
+                    '0x64c7044050ba0431fcf746ba90e77133f96a5a8b'  // Another common Morpho address (fixed checksum)
+                ];
+                
+                for (const addr of morphoAddresses) {
+                    try {
+                        const allowance = await collateralContract.allowance(userAddress, addr);
+                        if (allowance > 0) {
+                            console.log(`Found allowance for ${addr}:`, ethers.formatUnits(allowance, TOKEN_DECIMALS));
+                        }
+                    } catch (error) {
+                        console.log(`Error checking allowance for ${addr}:`, error.message);
+                    }
+                }
+                
+                if (currentAllowance < tokenAmountUnits) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Insufficient Allowance',
+                        text: 'Please approve the token spending again before supplying collateral.',
+                    });
+                    return;
+                }
+
+                // Show loading state
+                $supplyCollateralBtn.prop('disabled', true);
+                $supplySpinner.show();
+                $supplyCollateralBtn.html('<span class="spinner-border spinner-border-sm me-2" role="status"></span>Supplying...');
+
+                // Construct market parameters from URL params
+                const marketParams = {
+                    loanToken: urlParams.get('loan_token'),
+                    collateralToken: urlParams.get('collateral_token'),
+                    oracle: urlParams.get('oracle'),
+                    irm: urlParams.get('irm'),
+                    lltv: urlParams.get('lltv')
+                };
+
+                console.log('Market params:', marketParams);
+                console.log('SupplyCollateral amount:', ethers.formatUnits(tokenAmountUnits, TOKEN_DECIMALS));
+                console.log('SupplyCollateral amount (raw):', tokenAmountUnits.toString());
+                console.log('On behalf of:', userAddressInput);
+                console.log('From address:', userAddress);
+
+                // First, let's test if we can transfer cbBTC directly to isolate the issue
+                console.log('Testing direct cbBTC transfer...');
+                try {
+                    const transferGas = await collateralContract.transfer.estimateGas(userAddressInput, tokenAmountUnits);
+                    console.log('Direct transfer gas estimate successful:', transferGas.toString());
+                } catch (transferError) {
+                    console.error('Direct transfer would also fail:', transferError);
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'cbBTC Transfer Issue',
+                        text: 'The cbBTC token itself cannot be transferred. This might be due to minimum transfer amounts or token restrictions.',
+                    });
+                    return;
+                }
+
+                // Try to estimate gas for Morpho supplyCollateral
+                try {
+                    const gasEstimate = await morphoContract.supplyCollateral.estimateGas(
+                        marketParams,      // MarketParams struct
+                        tokenAmountUnits,  // assets to supply
+                        userAddressInput,  // onBehalf (address to supply for)
+                        "0x"              // data (empty bytes)
+                    );
+                    console.log('Morpho supplyCollateral gas estimate successful:', gasEstimate.toString());
+                } catch (gasError) {
+                    console.error('Morpho supplyCollateral gas estimation failed:', gasError);
+                    
+                    // Check if target address has existing position
+                    try {
+                        const existingPosition = await morphoContract.position(MARKET_ID, userAddressInput);
+                        console.log('Target address existing position:', {
+                            supplyShares: existingPosition.supplyShares.toString(),
+                            borrowShares: existingPosition.borrowShares.toString(),
+                            collateral: existingPosition.collateral.toString()
+                        });
+                        
+                        if (existingPosition.borrowShares === 0n) {
+                            Swal.fire({
+                                icon: 'info',
+                                title: 'No Existing Loan Position',
+                                text: 'The target address does not have an existing loan position. You may need to create a loan first before adding collateral.',
+                            });
+                            return;
+                        }
+                    } catch (posError) {
+                        console.error('Error checking existing position:', posError);
+                    }
+                    
+                    throw gasError;
+                }
+
+                // Execute supplyCollateral transaction
+                const tx = await morphoContract.supplyCollateral(
+                    marketParams,      // MarketParams struct
+                    tokenAmountUnits,  // assets to supply
+                    userAddressInput,  // onBehalf (address to supply for)
+                    "0x"              // data (empty bytes)
+                );
+                
+                Swal.fire({
+                    icon: 'info',
+                    title: 'Transaction Submitted',
+                    text: 'Please wait for confirmation...',
+                    showConfirmButton: false,
+                    timer: 3000
+                });
+
+                // Wait for transaction confirmation
+                const receipt = await tx.wait();
+
+                if (receipt.status === 1) {
+                    const symbol = await collateralContract.symbol();
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Collateral Added Successfully!',
+                        text: `Successfully added ${tokenAmount.toFixed(TOKEN_DECIMALS === 8 ? 8 : 6)} ${symbol} collateral for ${userAddressInput.slice(0, 6)}...${userAddressInput.slice(-4)}`,
+                        footer: `<a href="https://basescan.org/tx/${receipt.hash}" target="_blank">View on BaseScan</a>`
+                    });
+
+                    // Refresh collateral balance to show updated amount
+                    await updateCollateralBalance();
+                    
+                    // Complete step 4 and show step 5 with final results
+                    completeStep(4);
+                    
+                    // Update final collateral balance display
+                    const finalCollateralBalance = $currentCollateral.text();
+                    $finalCollateralBalance.text(finalCollateralBalance);
+                    
+                    // Refresh token balance
+                    await updateBalance();
+                } else {
+                    throw new Error('Transaction failed');
+                }
+
+            } catch (error) {
+                console.error('SupplyCollateral error:', error);
+                let errorMessage = 'SupplyCollateral transaction failed';
+                
+                if (error.code === 4001) {
+                    errorMessage = 'Transaction rejected by user';
+                } else if (error.message) {
+                    errorMessage = error.message;
+                }
+
+                Swal.fire({
+                    icon: 'error',
+                    title: 'SupplyCollateral Failed',
+                    text: errorMessage,
+                });
+            } finally {
+                // Reset button state
+                $supplyCollateralBtn.prop('disabled', false);
+                $supplySpinner.hide();
+                $supplyCollateralBtn.html('<span id="supply-spinner" class="spinner-border spinner-border-sm me-2" role="status" style="display: none;"></span>Supply Collateral');
+            }
+        }
+
+        // Disconnect Wallet
+        function disconnectWallet() {
+            provider = null;
+            signer = null;
+            userAddress = null;
+            collateralContract = null;
+            morphoContract = null;
+            helperContract = null;
+
+            $walletConnected.addClass('d-none');
+            $walletDisconnected.removeClass('d-none');
+            $collateralSection.hide();
+
+            $walletAddress.text('Not connected');
+            $networkStatus.text('Checking...');
+            $collateralBalance.text('Loading...');
+            
+            // Clear form and reset steps
+            $borrowerAddressInput.val('');
+            $collateralBalanceSection.hide();
+            $currentCollateral.text('Loading...');
+            $collateralAmountInput.val('');
+            $tokenConversion.text('0 tokens');
+            resetSteps();
+        }
+
+        // Handle account changes
+        if (window.ethereum) {
+            window.ethereum.on('accountsChanged', (accounts) => {
+                if (accounts.length === 0) {
+                    disconnectWallet();
+                } else if (userAddress && accounts[0] !== userAddress) {
+                    connectWallet();
+                }
+            });
+
+            window.ethereum.on('chainChanged', () => {
+                window.location.reload();
+            });
+        }
+
+        }); // End of document ready
+    </script>
+</body>
+</html>
